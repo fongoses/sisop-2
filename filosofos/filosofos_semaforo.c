@@ -1,3 +1,14 @@
+/* 
+Universidade Federal do Rio Grande do Sul - Instituto de Informatica
+Departamento de Informatica Aplicada
+Sistemas Operacionais IIN - 2013/2
+Professor: Alberto Egon Schaeffer Filho
+Alunos: Luiz Gustavo Frozi e  Mario Gasparoni Junior
+
+Ilustracao da solucao do problema leitores-descritores
+utilizando semaforos unnamed
+ 
+*/
 #include    <pthread.h>
 #include    <semaphore.h>
 #include    <stdlib.h>
