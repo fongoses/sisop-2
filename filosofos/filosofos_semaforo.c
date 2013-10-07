@@ -18,8 +18,8 @@ utilizando semaforos unnamed
 #include    <string.h>
 
 #define N_FILOSOFOS 5
-#define PENSANDO 'T'
-#define COMENDO 'E'
+#define THINKING 'T'
+#define EATING 'E'
 #define HUNGRY 'H'
 #define ms 1000
 
@@ -99,28 +99,28 @@ int garfosDisponiveis(id){
 
     int felizardo;
 
-    if ( (FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] == HUNGRY) && (FILOSOFOS[(id+1)%N_FILOSOFOS] == PENSANDO) && (FILOSOFOS[id] == HUNGRY)){ 
+    if ( (FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] == HUNGRY) && (FILOSOFOS[(id+1)%N_FILOSOFOS] == THINKING) && (FILOSOFOS[id] == HUNGRY)){ 
         //felizardo=sorteia3((id+N_FILOSOFOS-1)%N_FILOSOFOS,id,(id+1)%N_FILOSOFOS);
         felizardo=selecionaMaisVelho(id,(id+N_FILOSOFOS-1)%N_FILOSOFOS,(id+1)%N_FILOSOFOS);
         if(felizardo == id) { //se o felizardo eh o processo atual, come, senao espera os mais famintos/velhos comerem primeiro
-            alteraEstadoFilosofo(felizardo,COMENDO);
+            alteraEstadoFilosofo(felizardo,EATING);
             sem_post(&semaforoGarfos[id]);
         }
         return 1;
     } 
 
-   if ( (FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] == PENSANDO) && (FILOSOFOS[(id+1)%N_FILOSOFOS] == HUNGRY) && (FILOSOFOS[id] == HUNGRY)){ 
+   if ( (FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] == THINKING) && (FILOSOFOS[(id+1)%N_FILOSOFOS] == HUNGRY) && (FILOSOFOS[id] == HUNGRY)){ 
         //felizardo=sorteia3((id+N_FILOSOFOS-1)%N_FILOSOFOS,id,(id+1)%N_FILOSOFOS);
         felizardo=selecionaMaisVelho(id,(id+N_FILOSOFOS-1)%N_FILOSOFOS,(id+1)%N_FILOSOFOS);
         if(felizardo == id) { //se o felizardo eh o processo atual, come, senao espera os mais famintos/velhos comerem primeiro
-            alteraEstadoFilosofo(felizardo,COMENDO);
+            alteraEstadoFilosofo(felizardo,EATING);
             sem_post(&semaforoGarfos[id]);
         }
         return 1;
     } 
         
-    if ((FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] != COMENDO) && (FILOSOFOS[(id+1)%N_FILOSOFOS] != COMENDO) && (FILOSOFOS[id] == HUNGRY)){
-        alteraEstadoFilosofo(id,COMENDO);
+    if ((FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] != EATING) && (FILOSOFOS[(id+1)%N_FILOSOFOS] != EATING) && (FILOSOFOS[id] == HUNGRY)){
+        alteraEstadoFilosofo(id,EATING);
         sem_post(&semaforoGarfos[id]);
         return 1;
     }
@@ -137,7 +137,7 @@ void pegaGarfo(int id){
     alteraEstadoFilosofo(id,HUNGRY);    
     garfosDisponiveis(id);
 
-    while(FILOSOFOS[id]!=COMENDO){
+    while(FILOSOFOS[id]!=EATING){
         sem_post(&semaforoObjeto);
         sem_wait(&semaforoGarfos[id]);
         sem_post(&semaforoObjeto);
@@ -149,7 +149,10 @@ void pegaGarfo(int id){
 void largaGarfo(int id){
     sem_wait(&semaforoObjeto);    
     AGE[id]=0;
-    alteraEstadoFilosofo(id,PENSANDO);
+    alteraEstadoFilosofo(id,THINKING);
+    garfosDisponiveis((id+1)%N_FILOSOFOS);
+    garfosDisponiveis((id+N_FILOSOFOS-1)%N_FILOSOFOS);
+
     sem_post(&semaforoObjeto);
 }
 
@@ -171,7 +174,7 @@ int main(int argc, char *argv[ ]) {
     
     memset(AGE,0,sizeof(AGE));
     //filosofos iniciam pensando 
-    memset(FILOSOFOS,PENSANDO,sizeof(FILOSOFOS)); 
+    memset(FILOSOFOS,THINKING,sizeof(FILOSOFOS)); 
     pthread_t filosofosThread[N_FILOSOFOS];
     
     sem_init(&semaforoObjeto,0,1); //exclusao mutua (S=1) na variavel compartilhada 

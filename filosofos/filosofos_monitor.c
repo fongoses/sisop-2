@@ -22,8 +22,8 @@ o monitor eh composto pelas funcoes come() e libera()
 
 #define N_FILOSOFOS 5
 #define DELAY_MAX 10
-#define PENSANDO 'T'
-#define COMENDO 'E'
+#define THINKING 'T'
+#define EATING 'E'
 #define HUNGRY 'H'
 #define ms 1000
 
@@ -137,30 +137,30 @@ void alteraEstadoFilosofo(int id,char estado){
 int garfosDisponiveis(id){
     int felizardo;
  
-    if ( ((FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] == HUNGRY) || (FILOSOFOS[(id+1)%N_FILOSOFOS] == PENSANDO)) && (FILOSOFOS[id] == HUNGRY)){ 
+    if ( ((FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] == HUNGRY) || (FILOSOFOS[(id+1)%N_FILOSOFOS] == THINKING)) && (FILOSOFOS[id] == HUNGRY)){ 
         //felizardo=sorteia3((id+N_FILOSOFOS-1)%N_FILOSOFOS,id,(id+1)%N_FILOSOFOS);
         felizardo=selecionaMaisVelho(id,(id+N_FILOSOFOS-1)%N_FILOSOFOS,(id+1)%N_FILOSOFOS);
         if(felizardo == id) { //se o felizardo eh o processo atual, come, senao espera os mais famintos/velhos comerem primeiro
-            alteraEstadoFilosofo(felizardo,COMENDO);             
+            alteraEstadoFilosofo(felizardo,EATING);             
             pthread_cond_signal(&varCondicao[id]);
         }
         return 1;
     } 
 
 
-    if ( ((FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] == PENSANDO) || (FILOSOFOS[(id+1)%N_FILOSOFOS] == HUNGRY)) && (FILOSOFOS[id] == HUNGRY)){ 
+    if ( ((FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] == THINKING) || (FILOSOFOS[(id+1)%N_FILOSOFOS] == HUNGRY)) && (FILOSOFOS[id] == HUNGRY)){ 
         //felizardo=sorteia3((id+N_FILOSOFOS-1)%N_FILOSOFOS,id,(id+1)%N_FILOSOFOS);
         felizardo=selecionaMaisVelho(id,(id+N_FILOSOFOS-1)%N_FILOSOFOS,(id+1)%N_FILOSOFOS);
         if(felizardo == id) { //se o felizardo eh o processo atual, come, senao espera os mais famintos/velhos comerem primeiro
-            alteraEstadoFilosofo(felizardo,COMENDO);             
+            alteraEstadoFilosofo(felizardo,EATING);             
             pthread_cond_signal(&varCondicao[id]);
         }
         return 1;
     } 
  
     
-    if ((FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] != COMENDO) && (FILOSOFOS[(id+1)%N_FILOSOFOS] != COMENDO) && (FILOSOFOS[id] == HUNGRY)){
-        alteraEstadoFilosofo(id,COMENDO);
+    if ((FILOSOFOS[(id+N_FILOSOFOS-1)%N_FILOSOFOS] != EATING) && (FILOSOFOS[(id+1)%N_FILOSOFOS] != EATING) && (FILOSOFOS[id] == HUNGRY)){
+        alteraEstadoFilosofo(id,EATING);
         pthread_cond_signal(&varCondicao[id]);
         return 1;
     }
@@ -176,13 +176,13 @@ void pegaGarfo(int id){
 
     alteraEstadoFilosofo(id,HUNGRY);
     garfosDisponiveis(id);
-    while(FILOSOFOS[id] != COMENDO){       
+    while(FILOSOFOS[id] != EATING){       
         pthread_mutex_unlock(&mutexObjeto);
         pthread_cond_wait(&varCondicao[id],&mutexVarCondicao[id]);
         pthread_mutex_lock(&mutexObjeto); 
     }
      
-    alteraEstadoFilosofo(id,COMENDO);
+    alteraEstadoFilosofo(id,EATING);
     pthread_mutex_unlock(&mutexObjeto);
 }
 
@@ -223,7 +223,7 @@ int main(int argc, char ** argv){
     memset(AGE,0,sizeof(AGE));
     
     //filosofos iniciam pensando 
-    memset(FILOSOFOS,PENSANDO,sizeof(FILOSOFOS)); 
+    memset(FILOSOFOS,THINKING,sizeof(FILOSOFOS)); 
     
     //1 mutex para controle do lock do objeto (ou seja,
     //de todas suas variaveis)
