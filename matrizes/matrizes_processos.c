@@ -10,6 +10,7 @@
 #include <time.h>
 #define MAX_DIMENSION 30
 #define MAX_PROCESSOS 10
+#define DEBUG 0
 int m1,n1,m2,n2;
 int *M1,*M2;
 int N_THREADS=0;
@@ -103,7 +104,6 @@ void leMatrizesEntrada(){
     }
     fclose(fp1);
 
-    //printaMatriz(M1,m1,n1);
     memset(linha,0,MAX_DIMENSION);
 
     //restante da matriz 2 
@@ -121,9 +121,6 @@ void leMatrizesEntrada(){
         j2=0; 
     }
     fclose(fp2);
-    
-    //fprintf(stdout,"\n");
-    //printaMatriz(M2,m2,n2);
 
 }
 
@@ -132,14 +129,14 @@ void multiplicaLinhaM1ColunaM2ArmazenandoEmM3(int linha,int coluna){
     int j;
     int *M3 = (int*) sharedMemory;
 
-    //fprintf(stdout,"Soma: ");
+    if (DEBUG) fprintf(stdout,"Soma: ");
 
     for(j=0;j<n1;j++){ //j eh coluna em M1
-        //fprintf(stdout,"M1[%d,%d]=%d *M2[%d,%d]=%d +",linha,j,j,coluna,M1[linha*n1+j],M2[j*n2 +coluna]);
         M3[linha*n1 + coluna]+=M1[linha*n1+j] * M2[j*n2+coluna];
+        if(DEBUG)fprintf(stdout,"M1[%d,%d]=%d * M2[%d,%d]=%d +",linha,j,M1[linha*n1+j],j,coluna,M2[j*n2 +coluna]);
     }
-
-    //fprintf(stdout,"\n");
+    
+    if(DEBUG)fprintf(stdout," = %d\n",M3[linha*n1+coluna]);
 }
 
 
@@ -148,7 +145,7 @@ void multiplicaLinhaM1ColunaM2ArmazenandoEmM3(int linha,int coluna){
 void multiplica(int start,int end){
     int i,j;
     
-    //fprintf(stdout,"Vou operar nas linhas em [%d,%d)\n",start,end);
+    if(DEBUG) fprintf(stdout,"Sou um processo filho e vou operar nas linhas em M1[%d,%d)\n",start,end);
     for(i=start;i<end;i++)
         for(j=start;j<end;j++)
             multiplicaLinhaM1ColunaM2ArmazenandoEmM3(i,j);
@@ -157,8 +154,9 @@ void multiplica(int start,int end){
 
 int main(int argc, char **argv){
 
-    int nProcessos;
+    int nProcessos;    
     int nLinhasPorProcesso;
+    int linhasRestantes;
     pid_t pid_filhos[MAX_PROCESSOS];
     pid_t pid;
     int i;
@@ -176,16 +174,23 @@ int main(int argc, char **argv){
         exit(0);
     
     }
+    
+    if(nProcessos == 0){
+        fprintf(stdout,"NUMERO_PROCESSOS > 0\n");
+        exit(0);
+    }
  
     memset(pid_filhos,0,sizeof(pid));
     leMatrizesEntrada();
-    nLinhasPorProcesso=nProcessos/m1;    
-
-    if (nProcessos > m1){
-        fprintf(stdout,"Numero de Processos deve ser menor ou igual ao numero de linhas\n");
-        exit(0); 
+    if (nProcessos >= m1){
+        nProcessos=m1;
+        fprintf(stdout,"Numero de Processos reduzido a 1 para cada linha da matriz.\n\n");
+        //exit(0); 
     
-    }
+    }        
+
+    nLinhasPorProcesso=m1/nProcessos;
+    linhasRestantes = m1 % nProcessos;
 
     //cria e inicializa memoria compartilhada
     segmentSize=sizeof(int)*m1*n2; //memoria compartilhada armazena o resultado final da multiplicacao
@@ -205,7 +210,9 @@ int main(int argc, char **argv){
             //Codigo do filho
     
             sharedMemory = shmat(sharedSegmentId,NULL,0);
-            multiplica(i*nLinhasPorProcesso,i*nLinhasPorProcesso + nLinhasPorProcesso);
+            if(i<nProcessos-1) multiplica(i*nLinhasPorProcesso,i*nLinhasPorProcesso + nLinhasPorProcesso);
+            else multiplica(i*nLinhasPorProcesso,i*nLinhasPorProcesso + nLinhasPorProcesso+linhasRestantes);
+
            
             //Fim do codigo do filho
             return 1;
