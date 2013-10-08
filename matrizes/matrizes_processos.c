@@ -198,7 +198,7 @@ int main(int argc, char **argv){
     
     //executa os nProcessos filhos, tomando nota do tempo
     gettimeofday(&tempoInicioExecucao);
-    /*for(i=0;i<nProcessos;i++){
+    for(i=0;i<nProcessos;i++){
         pid = fork();
         if (pid <0) exit(0); //fork falhou
         if (pid == 0) {
@@ -215,7 +215,7 @@ int main(int argc, char **argv){
             pid_filhos[i]=pid;
             //getchar();
         }
-    }*/
+    }
     //apos criar os filhos, pai aguarda por cada um  deles    
     for(i=0;i<nProcessos;i++) 
         waitpid(pid_filhos[i],0,0);
@@ -230,6 +230,6 @@ int main(int argc, char **argv){
     printaMatriz(M2,m2,n2);
     fprintf(stdout,"\n = \n\nM3\n"); 
     printaMatriz((int*)sharedMemory,n1,m2);
-    fprintf(stdout,"\nTempo total da execucao(us): %d.%d\n\n",(tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec),tempoFimExecucao.tv_usec - tempoInicioExecucao.tv_usec);
+    fprintf(stdout,"\nTempo total da execucao(s:us): %d:%d\n\n",(tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec),tempoFimExecucao.tv_usec - tempoInicioExecucao.tv_usec);
     return 0;
 }
