@@ -1,3 +1,15 @@
+/* 
+Universidade Federal do Rio Grande do Sul - Instituto de Informatica
+Departamento de Informatica Aplicada
+Sistemas Operacionais IIN - 2013/2
+Professor: Alberto Egon Schaeffer Filho
+Alunos: Luiz Gustavo Frozi e  Mario Gasparoni Junior
+
+Calculo da multiplicacao de matrizes utilizando paralelismo
+atraves das primitivas para gerencia de processos filho no Linux.
+Tambem foi utilizada uma estrutura de memoria compartilhada.
+ 
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
