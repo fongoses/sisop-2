@@ -2,7 +2,7 @@
 all: matrizes_processos
 
 matrizes_processos: matrizes_processos.c
-	gcc -o matrizes_processos matrizes_processos.c -lpthread
+	gcc -o matrizes_processos matrizes_processos.c -lpthread -lrt
 
 
 clean: 

@@ -7,6 +7,7 @@
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <time.h>
 #define MAX_DIMENSION 30
 #define MAX_PROCESSOS 10
 int m1,n1,m2,n2;
@@ -161,7 +162,8 @@ int main(int argc, char **argv){
     pid_t pid_filhos[MAX_PROCESSOS];
     pid_t pid;
     int i;
-    char filho[10];
+    struct timeval tempoInicioExecucao,tempoFimExecucao;
+    time_t t1,t2;
    
     if(argc < 2){
         fprintf(stdout,"uso: matrizes_processos [NUMERO_PROCESSOS]\n");
@@ -175,26 +177,28 @@ int main(int argc, char **argv){
     
     }
  
+    memset(pid_filhos,0,sizeof(pid));
     leMatrizesEntrada();
+    nLinhasPorProcesso=nProcessos/m1;    
+
     if (nProcessos > m1){
         fprintf(stdout,"Numero de Processos deve ser menor ou igual ao numero de linhas\n");
         exit(0); 
     
     }
 
-    nLinhasPorProcesso=nProcessos/m1;
-    memset(pid_filhos,0,sizeof(pid));
-    
+    //cria e inicializa memoria compartilhada
     segmentSize=sizeof(int)*m1*n2; //memoria compartilhada armazena o resultado final da multiplicacao
-    sharedSegmentId  = shmget(IPC_PRIVATE , segmentSize, S_IRUSR | S_IWUSR); //cria segmento compartilhado
-    
+    sharedSegmentId  = shmget(IPC_PRIVATE , segmentSize, S_IRUSR | S_IWUSR); //cria segmento compartilhado    
     if ((sharedMemory = (char*)shmat(sharedSegmentId,NULL,0)) == (char*)-1){
         fprintf(stdout,"Error in shmat: %s\n",strerror(errno));
         exit(0);
     }
     memset(sharedMemory,0,segmentSize);
     
-    for(i=0;i<nProcessos;i++){
+    //executa os nProcessos filhos, tomando nota do tempo
+    gettimeofday(&tempoInicioExecucao);
+    /*for(i=0;i<nProcessos;i++){
         pid = fork();
         if (pid <0) exit(0); //fork falhou
         if (pid == 0) {
@@ -206,22 +210,26 @@ int main(int argc, char **argv){
             //Fim do codigo do filho
             return 1;
         }
-        else {          // pid!=0; parent process 
-            //printf("sou o pai e vou acabar logo");
+        else {
+        //codigo do processo pai, daqui em diante 
             pid_filhos[i]=pid;
-            sprintf(filho,"Pai ve o pid do filho: %d",pid_filhos[i]); 
-            //multiplica(filho);
             //getchar();
-            waitpid(pid,0,0);//pai espera por todos os filhos 
         }
-    }
-
+    }*/
+    //apos criar os filhos, pai aguarda por cada um  deles    
+    for(i=0;i<nProcessos;i++) 
+        waitpid(pid_filhos[i],0,0);
+  
+    //Termino da execucao dos filhos
+    gettimeofday(&tempoFimExecucao);
+    
+    //imprime estatistica
     fprintf(stdout,"M1\n");
     printaMatriz(M1,m1,n1);
     fprintf(stdout,"\n X \n\nM2\n"); 
     printaMatriz(M2,m2,n2);
     fprintf(stdout,"\n = \n\nM3\n"); 
     printaMatriz((int*)sharedMemory,n1,m2);
-
+    fprintf(stdout,"\nTempo total da execucao(us): %d.%d\n\n",(tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec),tempoFimExecucao.tv_usec - tempoInicioExecucao.tv_usec);
     return 0;
 }
