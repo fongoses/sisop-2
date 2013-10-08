@@ -21,17 +21,18 @@ Tambem foi utilizada uma estrutura de memoria compartilhada.
 #include <errno.h>
 #include <time.h>
 #define MAX_DIMENSION 30
-#define MAX_PROCESSOS 10
+#define MAX_THREADS 10
 #define DEBUG 0
-int m1,n1,m2,n2;
-int *M1,*M2;
+int m1,n1,m2,n2,m3,n3;
+int *M1,*M2,*M3;
 int N_THREADS=0;
 
  
-//memoria compartilhada
-int segmentSize=0;
-int sharedSegmentId;
-char * sharedMemory;
+
+//global  ja que as threads utilizam essas variaveis
+int nThreads;    
+int nLinhasPorThread;
+int linhasRestantes;
 
 void printaMatriz(int *M,int m,int n){
     int i,j;
@@ -139,7 +140,6 @@ void leMatrizesEntrada(){
 void multiplicaLinhaM1ColunaM2ArmazenandoEmM3(int linha,int coluna){
     int i;
     int j;
-    int *M3 = (int*) sharedMemory;
 
     if (DEBUG) fprintf(stdout,"Soma: ");
 
@@ -157,88 +157,77 @@ void multiplicaLinhaM1ColunaM2ArmazenandoEmM3(int linha,int coluna){
 void multiplica(int start,int end){
     int i,j;
     
-    if(DEBUG) fprintf(stdout,"Sou um processo filho e vou operar nas linhas em M1[%d,%d)\n",start,end);
+    if(DEBUG) fprintf(stdout,"Sou uma thread e vou operar nas linhas em M1[%d,%d)\n",start,end);
     for(i=start;i<end;i++)
-        for(j=0;j<n2;j++)
+        for(j=0;j<n2;j++) 
             multiplicaLinhaM1ColunaM2ArmazenandoEmM3(i,j);
+        
 }
 
 
+void threadMain(void *logical_id){
+    
+    int id = *(int*)logical_id; //id logico da thread, no contexto dessa aplicacao.
+                        //Numerado de 0 a nThreads.
+    
+    int i=*(int*)logical_id; //a partir do id da thread, determinamos qual seu subconjunto de linhas
+    //fprintf(stdout,"i: %d, j: %d, nLinhasPorThread: %d, linhasRestantes: %d",i,i,nLinhasPorThread,linhasRestantes); 
+    if(i<nThreads-1) multiplica(i*nLinhasPorThread,i*nLinhasPorThread + nLinhasPorThread);
+    else multiplica(i*nLinhasPorThread,i*nLinhasPorThread + nLinhasPorThread+linhasRestantes);   
+    pthread_exit(0); 
+
+}
+
 int main(int argc, char **argv){
 
-    int nProcessos;    
-    int nLinhasPorProcesso;
-    int linhasRestantes;
-    pid_t pid_filhos[MAX_PROCESSOS];
-    pid_t pid;
+    pthread_t threads[MAX_THREADS];
     int i;
     struct timeval tempoInicioExecucao,tempoFimExecucao;
-    time_t t1,t2;
+    useconds_t delay=100*1000; //100ms
    
     if(argc < 2){
-        fprintf(stdout,"uso: matrizes_processos [NUMERO_PROCESSOS]\n");
+        fprintf(stdout,"uso: matrizes_threads[NUMERO_THREADS]\n");
         exit(0);
     } 
     
-    nProcessos = atoi(argv[1]);
-    if(nProcessos>MAX_PROCESSOS){
-        fprintf(stdout,"Numero maximo de Processos permitidos: %d",MAX_PROCESSOS);
+    nThreads = atoi(argv[1]);
+    if(nThreads>MAX_THREADS){
+        fprintf(stdout,"Numero maximo de Threads permitidas: %d",MAX_THREADS);
         exit(0);
     
     }
     
-    if(nProcessos == 0){
-        fprintf(stdout,"NUMERO_PROCESSOS > 0\n");
+    if(nThreads == 0){
+        fprintf(stdout,"NUMERO_THREADS > 0\n");
         exit(0);
     }
  
-    memset(pid_filhos,0,sizeof(pid));
+    memset(threads,0,sizeof(pthread_t)*MAX_THREADS);
     leMatrizesEntrada();
-    if (nProcessos >= m1){
-        nProcessos=m1;
-        fprintf(stdout,"Numero de Processos reduzido a 1 para cada linha da matriz.\n\n");
+    if (nThreads > m1){
+        nThreads=m1;
+        fprintf(stdout,"Numero de Threads reduzido a 1 para cada linha da matriz.\n\n");
         //exit(0); 
-    
     }        
 
-    nLinhasPorProcesso=m1/nProcessos;
-    linhasRestantes = m1 % nProcessos;
+    nLinhasPorThread=m1/nThreads;
+    linhasRestantes = m1 % nThreads;
 
-    //cria e inicializa memoria compartilhada
-    segmentSize=sizeof(int)*m1*n2; //memoria compartilhada armazena o resultado final da multiplicacao
-    sharedSegmentId  = shmget(IPC_PRIVATE , segmentSize, S_IRUSR | S_IWUSR); //cria segmento compartilhado    
-    if ((sharedMemory = (char*)shmat(sharedSegmentId,NULL,0)) == (char*)-1){
-        fprintf(stdout,"Error in shmat: %s\n",strerror(errno));
-        exit(0);
-    }
-    memset(sharedMemory,0,segmentSize);
-    
-    //executa os nProcessos filhos, tomando nota do tempo
+    m3=m1;
+    n3=n2;
+    M3 = (int*)malloc(sizeof(int)*m3*n3);
+    memset(M3,0,sizeof(int)*m3*n3);
+    //executa os nThreads filhos, tomando nota do tempo
     gettimeofday(&tempoInicioExecucao);
-    for(i=0;i<nProcessos;i++){
-        pid = fork();
-        if (pid <0) exit(0); //fork falhou
-        if (pid == 0) {
-            //Codigo do filho
-    
-            sharedMemory = shmat(sharedSegmentId,NULL,0);
-            if(i<nProcessos-1) multiplica(i*nLinhasPorProcesso,i*nLinhasPorProcesso + nLinhasPorProcesso);
-            else multiplica(i*nLinhasPorProcesso,i*nLinhasPorProcesso + nLinhasPorProcesso+linhasRestantes);
 
-           
-            //Fim do codigo do filho
-            return 1;
-        }
-        else {
-        //codigo do processo pai, daqui em diante 
-            pid_filhos[i]=pid;
-            //getchar();
-        }
+    for(i=0;i<nThreads;i++){
+        pthread_create(&threads[i],NULL,threadMain,(void*)&i);
+        usleep(delay); //dorme um pouco, para n incrementar o i antes da thread inicializar
     }
-    //apos criar os filhos, pai aguarda por cada um  deles    
-    for(i=0;i<nProcessos;i++) 
-        waitpid(pid_filhos[i],0,0);
-  
+    
+    for(i=0;i<nThreads;i++)
+        pthread_join(threads[i],NULL); //aguarda termino da thread recem criada
+
     //Termino da execucao dos filhos
     gettimeofday(&tempoFimExecucao);
     
@@ -248,7 +237,7 @@ int main(int argc, char **argv){
     fprintf(stdout,"\n X \n\nM2\n"); 
     printaMatriz(M2,m2,n2);
     fprintf(stdout,"\n = \n\nM3\n"); 
-    printaMatriz((int*)sharedMemory,n1,m2);
-    fprintf(stdout,"\nTempo total da execucao(s:us): %d:%d\n\n",(tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec),tempoFimExecucao.tv_usec - tempoInicioExecucao.tv_usec);
+    printaMatriz(M3,n1,m2);
+    fprintf(stdout,"\nTempo total da execucao(s:us): %d:%d\n\n",(tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec),abs(tempoFimExecucao.tv_usec - tempoInicioExecucao.tv_usec));
     return 0;
 }
