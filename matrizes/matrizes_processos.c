@@ -2,12 +2,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h> /* for pid_t */
-#include <sys/wait.h> /* for wait */
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <errno.h>
 #define MAX_DIMENSION 30
-
+#define MAX_PROCESSOS 10
 int m1,n1,m2,n2;
 int *M1,*M2;
+int N_THREADS=0;
+
+ 
+//memoria compartilhada
+int segmentSize=0;
+int sharedSegmentId;
+char * sharedMemory;
 
 void printaMatriz(int *M,int m,int n){
     int i,j;
@@ -40,13 +50,13 @@ void leMatrizesEntrada(){
     strtok(linha," ");
     strtok(NULL," ");
     m1 = atoi(strtok(NULL," "));
-    fprintf(stdout,"m1: %d\n",m1);
+    //fprintf(stdout,"m1: %d\n",m1);
 
     fgets(linha,MAX_DIMENSION,fp1); //2linha
     strtok(linha," ");
     strtok(NULL," ");
     n1 = atoi(strtok(NULL," "));
-    fprintf(stdout,"n1: %d\n",n1);
+    //fprintf(stdout,"n1: %d\n",n1);
 
 
     //matriz 2
@@ -61,13 +71,13 @@ void leMatrizesEntrada(){
     strtok(linha," ");
     strtok(NULL," ");
     m2 = atoi(strtok(NULL," "));
-    fprintf(stdout,"m2: %d\n",m2);
+    //fprintf(stdout,"m2: %d\n",m2);
 
     fgets(linha,MAX_DIMENSION,fp2); //2linha
     strtok(linha," ");
     strtok(NULL," ");
     n2 = atoi(strtok(NULL," "));
-    fprintf(stdout,"n2: %d\n",n2);
+    //fprintf(stdout,"n2: %d\n",n2);
     
     if(n1!=n2){
         fprintf(stdout,"Error: different dimensions\n");
@@ -92,7 +102,7 @@ void leMatrizesEntrada(){
     }
     fclose(fp1);
 
-    printaMatriz(M1,m1,n1);
+    //printaMatriz(M1,m1,n1);
     memset(linha,0,MAX_DIMENSION);
 
     //restante da matriz 2 
@@ -110,35 +120,108 @@ void leMatrizesEntrada(){
         j2=0; 
     }
     fclose(fp2);
-    fprintf(stdout,"\n");
-    printaMatriz(M2,m2,n2);
+    
+    //fprintf(stdout,"\n");
+    //printaMatriz(M2,m2,n2);
 
 }
 
-void doWork(char *arg) {
-    while (1) {
-        printf("%s\n", arg);
+void multiplicaLinhaM1ColunaM2ArmazenandoEmM3(int linha,int coluna){
+    int i;
+    int j;
+    int *M3 = (int*) sharedMemory;
+
+    //fprintf(stdout,"Soma: ");
+
+    for(j=0;j<n1;j++){ //j eh coluna em M1
+        //fprintf(stdout,"M1[%d,%d]=%d *M2[%d,%d]=%d +",linha,j,j,coluna,M1[linha*n1+j],M2[j*n2 +coluna]);
+        M3[linha*n1 + coluna]+=M1[linha*n1+j] * M2[j*n2+coluna];
     }
+
+    //fprintf(stdout,"\n");
 }
 
 
-int main()
-{
+//realiza a multiplicacao dos valores das matrizes
+//void multiplica(int m1,int m2) {
+void multiplica(int start,int end){
+    int i,j;
+    
+    //fprintf(stdout,"Vou operar nas linhas em [%d,%d)\n",start,end);
+    for(i=start;i<end;i++)
+        for(j=start;j<end;j++)
+            multiplicaLinhaM1ColunaM2ArmazenandoEmM3(i,j);
+}
 
-    /*
-    //Spawn a new process to run alongside us.
-    pid_t pid = fork();
-    if (pid == 0) {     // child process 
-        doWork("child");  
+
+int main(int argc, char **argv){
+
+    int nProcessos;
+    int nLinhasPorProcesso;
+    pid_t pid_filhos[MAX_PROCESSOS];
+    pid_t pid;
+    int i;
+    char filho[10];
+   
+    if(argc < 2){
+        fprintf(stdout,"uso: matrizes_processos [NUMERO_PROCESSOS]\n");
+        exit(0);
+    } 
+    
+    nProcessos = atoi(argv[1]);
+    if(nProcessos>MAX_PROCESSOS){
+        fprintf(stdout,"Numero maximo de Processos permitidos: %d",MAX_PROCESSOS);
+        exit(0);
+    
+    }
+ 
+    leMatrizesEntrada();
+    if (nProcessos > m1){
+        fprintf(stdout,"Numero de Processos deve ser menor ou igual ao numero de linhas\n");
+        exit(0); 
+    
+    }
+
+    nLinhasPorProcesso=nProcessos/m1;
+    memset(pid_filhos,0,sizeof(pid));
+    
+    segmentSize=sizeof(int)*m1*n2; //memoria compartilhada armazena o resultado final da multiplicacao
+    sharedSegmentId  = shmget(IPC_PRIVATE , segmentSize, S_IRUSR | S_IWUSR); //cria segmento compartilhado
+    
+    if ((sharedMemory = (char*)shmat(sharedSegmentId,NULL,0)) == (char*)-1){
+        fprintf(stdout,"Error in shmat: %s\n",strerror(errno));
         exit(0);
     }
-    else {          // pid!=0; parent process 
-        //printf("sou o pai e vou acabar logo");
-        doWork("parent");
-        waitpid(pid,0,0);   // wait for child to exit 
+    memset(sharedMemory,0,segmentSize);
+    
+    for(i=0;i<nProcessos;i++){
+        pid = fork();
+        if (pid <0) exit(0); //fork falhou
+        if (pid == 0) {
+            //Codigo do filho
+    
+            sharedMemory = shmat(sharedSegmentId,NULL,0);
+            multiplica(i*nLinhasPorProcesso,i*nLinhasPorProcesso + nLinhasPorProcesso);
+           
+            //Fim do codigo do filho
+            return 1;
+        }
+        else {          // pid!=0; parent process 
+            //printf("sou o pai e vou acabar logo");
+            pid_filhos[i]=pid;
+            sprintf(filho,"Pai ve o pid do filho: %d",pid_filhos[i]); 
+            //multiplica(filho);
+            //getchar();
+            waitpid(pid,0,0);//pai espera por todos os filhos 
+        }
     }
 
-    */
-    leMatrizesEntrada();
+    fprintf(stdout,"M1\n");
+    printaMatriz(M1,m1,n1);
+    fprintf(stdout,"\n X \n\nM2\n"); 
+    printaMatriz(M2,m2,n2);
+    fprintf(stdout,"\n = \n\nM3\n"); 
+    printaMatriz((int*)sharedMemory,n1,m2);
+
     return 0;
 }
