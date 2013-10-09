@@ -57,7 +57,7 @@
 struct MATRIX {
     int linhas;
     int colunas;
-    long *elemento;
+    long *valor;
 };
 
 int n_linhas = 0, n_colunas = 0;
@@ -65,12 +65,83 @@ struct MATRIX *A;
 FILE *arquivo;
 
 struct MATRIX *gerarIdentidade(int linhas, int colunas) {
+    struct MATRIX *I;
+    int i = 0, j = 0;
+
+    I = (struct MATRIX *) malloc(sizeof(struct MATRIX));
+
+    I->linhas = linhas;
+    I->colunas = colunas;
+
+    I->valor = (long *) malloc((linhas * colunas) * sizeof(long));
+
+    for(i = 0; i < I->linhas; i++) {
+        for(j = 0; j < I->colunas; j++) {
+            if(i == j)
+                //I->valor[i][j] = 1;
+                I->valor[(i * (I->colunas)) + j] = 1;
+            else
+                //I->valor[i][j] = 0;
+                I->valor[(i * (I->colunas)) + j] = 0;
+        }
+    }
+
+    return I;
 }
 
 struct MATRIX *gerarMatriz(int linhas, int colunas) {
+    struct MATRIX *M;
+    int i = 0, j = 0;
+
+    srand(time(NULL));
+
+    M = (struct MATRIX *) malloc(sizeof(struct MATRIX));
+
+    M->linhas = linhas;
+    M->colunas = colunas;
+
+    M->valor = (long *) malloc((linhas * colunas) * sizeof(long));
+
+    for(i = 0; i < M->linhas; i++) {
+        for(j = 0; j < M->colunas; j++) {
+            //M->valor[i][j] = ((2 * (rand() % 2)) - 1) * (rand() % VALOR_MAXIMO);
+            M->valor[(i * (M->colunas)) + j] = ((2 * (rand() % 2)) - 1) * (rand() % VALOR_MAXIMO);
+        }
+    }
+
+    return M;
 }
 
-void gravarArquivo(struct MATRIX M, FILE arq) {
+void imprimirMatriz(struct MATRIX *M) {
+    int i = 0, j = 0;
+
+    printf("LINHAS = %d\n", M->linhas);
+    printf("COLUNAS = %d\n", M->colunas);
+
+    for(i = 0; i < M->linhas; i++) {
+        for(j = 0; j < M->colunas; j++) {
+            //printf("%5ld ", M->valor[i][j]);
+            printf("%5ld ", M->valor[(i * (M->colunas)) + j]);
+        }
+        printf("\n");
+    }
+}
+
+void gravarMatriz(FILE *arq, struct MATRIX *M) {
+    int i = 0, j = 0;
+
+    fprintf(arq, "LINHAS = %d\n", M->linhas);
+    fprintf(arq, "COLUNAS = %d\n", M->colunas);
+
+    for(i = 0; i < M->linhas; i++) {
+        for(j = 0; j < M->colunas; j++) {
+            //fprintf(arq, "%ld", M->valor[i][j]);
+            fprintf(arq, "%ld", M->valor[(i * (M->colunas)) + j]);
+            if(j < (M->colunas - 1))
+                fprintf(arq, " ");
+        }
+        fprintf(arq, "\n");
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -82,7 +153,7 @@ int main(int argc, char *argv[]) {
     n_linhas = atoi(argv[1]);
     n_colunas = atoi(argv[2]);
 
-    if(argc == 4) {
+    if(argc == 5) {
         if(strcmp(argv[3], "-i") != 0) {
             printf("Uso: $ geramatriz <n_linhas> <n_colunas> [-i] <arquivo_saida>\n");
             return(1);
@@ -107,7 +178,9 @@ int main(int argc, char *argv[]) {
         A = gerarMatriz(n_linhas, n_colunas);
     }
 
-    gravarArquivo(A, arquivo);
+    imprimirMatriz(A);
+
+    gravarMatriz(arquivo, A);
 
     close(arquivo);
 
