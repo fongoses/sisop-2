@@ -38,8 +38,8 @@ void printaMatriz(int *M,int m,int n){
     
     if (!M) return;
 
-    for(i=0;i<n;i++){
-        for(j=0;j<m;j++)
+    for(i=0;i<m;i++){
+        for(j=0;j<n;j++)
             fprintf(stdout,"%d ",M[i*n+j]);
         fprintf(stdout,"\n");   
     }
@@ -47,8 +47,8 @@ void printaMatriz(int *M,int m,int n){
 
 void leMatrizesEntrada(){
     FILE * fp1,*fp2;
-    char PATH1[]="teste1/in1.txt";
-    char PATH2[]="teste1/in2.txt";
+    char PATH1[]="teste2/in1.txt";
+    char PATH2[]="teste2/in2.txt";
     fp1 = fopen(PATH1,"r");
     
     if (!fp1) {
@@ -64,13 +64,13 @@ void leMatrizesEntrada(){
     strtok(linha," ");
     strtok(NULL," ");
     m1 = atoi(strtok(NULL," "));
-    //fprintf(stdout,"m1: %d\n",m1);
+    if (DEBUG)fprintf(stdout,"m1: %d\n",m1);
 
     fgets(linha,MAX_DIMENSION,fp1); //2linha
     strtok(linha," ");
     strtok(NULL," ");
     n1 = atoi(strtok(NULL," "));
-    //fprintf(stdout,"n1: %d\n",n1);
+    if (DEBUG) fprintf(stdout,"n1: %d\n",n1);
 
 
     //matriz 2
@@ -93,7 +93,7 @@ void leMatrizesEntrada(){
     n2 = atoi(strtok(NULL," "));
     //fprintf(stdout,"n2: %d\n",n2);
     
-    if(n1!=n2){
+    if(n1!=m2){
         fprintf(stdout,"Error: different dimensions\n");
         fclose(fp1);
         fclose(fp2);
