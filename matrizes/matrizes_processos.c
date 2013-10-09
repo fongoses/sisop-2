@@ -47,8 +47,8 @@ void printaMatriz(int *M,int m,int n){
 
 void leMatrizesEntrada(){
     FILE * fp1,*fp2;
-    char PATH1[]="teste2/in1.txt";
-    char PATH2[]="teste2/in2.txt";
+    char PATH1[]="t1/in1.txt";
+    char PATH2[]="t1/in2.txt";
     fp1 = fopen(PATH1,"r");
     
     if (!fp1) {
