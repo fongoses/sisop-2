@@ -22,8 +22,8 @@ Tambem foi utilizada uma estrutura de memoria compartilhada.
 #include <time.h>
 #define MAX_DIMENSION 30
 #define MAX_PROCESSOS 10
-#define DEBUG 0
-int m1,n1,m2,n2;
+#define DEBUG 1
+int m1,n1,m2,n2,m3,n3;
 int *M1,*M2;
 int N_THREADS=0;
 
@@ -154,11 +154,11 @@ void multiplicaLinhaM1ColunaM2ArmazenandoEmM3(int linha,int coluna){
     if (DEBUG) fprintf(stdout,"Soma: ");
 
     for(j=0;j<n1;j++){ //j eh coluna em M1
-        M3[linha*n1 + coluna]+=M1[linha*n1+j] * M2[j*n2+coluna];
+        M3[linha*n2 + coluna]+=M1[linha*n1+j] * M2[j*n2+coluna];
         if(DEBUG)fprintf(stdout,"M1[%d,%d]=%d * M2[%d,%d]=%d +",linha,j,M1[linha*n1+j],j,coluna,M2[j*n2 +coluna]);
     }
     
-    if(DEBUG)fprintf(stdout," = %d\n",M3[linha*n1+coluna]);
+    if(DEBUG)fprintf(stdout," = M3[%d,%d] = %d\n",linha,coluna,M3[linha*n2+coluna]);
 }
 
 
@@ -221,6 +221,9 @@ int main(int argc, char **argv){
     nLinhasPorProcesso=m1/nProcessos;
     linhasRestantes = m1 % nProcessos;
 
+    m3=m1;
+    n3=n2;
+
     //cria e inicializa memoria compartilhada
     segmentSize=sizeof(int)*m1*n2; //memoria compartilhada armazena o resultado final da multiplicacao
     sharedSegmentId  = shmget(IPC_PRIVATE , segmentSize, S_IRUSR | S_IWUSR); //cria segmento compartilhado    
@@ -265,7 +268,7 @@ int main(int argc, char **argv){
     fprintf(stdout,"\n X \n\nM2\n"); 
     printaMatriz(M2,m2,n2);
     fprintf(stdout,"\n = \n\nM3\n"); 
-    printaMatriz((int*)sharedMemory,n1,m2);
-    fprintf(stdout,"\nTempo total da execucao(s:us): %d:%d\n\n",(tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec),tempoFimExecucao.tv_usec - tempoInicioExecucao.tv_usec);
+    printaMatriz((int*)sharedMemory,m3,n3);
+    fprintf(stdout,"\nTempo total da execucao(s:us): %d:%d\n\n",(int)(tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec),abs(tempoFimExecucao.tv_usec - tempoInicioExecucao.tv_usec));
     return 0;
 }
