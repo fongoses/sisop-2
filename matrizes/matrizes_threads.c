@@ -21,7 +21,7 @@ Tambem foi utilizada uma estrutura de memoria compartilhada.
 #include <errno.h>
 #include <time.h>
 #define MAX_DIMENSION 30
-#define MAX_THREADS 10
+#define MAX_THREADS 15
 #define DEBUG 0
 int m1,n1,m2,n2,m3,n3;
 int *M1,*M2,*M3;
@@ -46,10 +46,8 @@ void printaMatriz(int *M,int m,int n){
     }
 }
 
-void leMatrizesEntrada(){
+void leMatrizesEntrada(char * PATH1,char*PATH2){
     FILE * fp1,*fp2;
-    char PATH1[]="t1/in1.txt";
-    char PATH2[]="t1/in2.txt";
     fp1 = fopen(PATH1,"r");
     
     if (!fp1) {
@@ -72,6 +70,12 @@ void leMatrizesEntrada(){
     strtok(NULL," ");
     n1 = atoi(strtok(NULL," "));
     if(DEBUG)fprintf(stdout,"n1: %d\n",n1);
+
+    if(n1>MAX_DIMENSION){
+        fclose(fp1);
+        fprintf(stdout,"Max dimesion excedeed\n");
+        exit(3);
+    }
 
 
     //matriz 2
@@ -100,6 +104,15 @@ void leMatrizesEntrada(){
         fclose(fp2);
         exit(0);
     }
+
+    if(n2>MAX_DIMENSION){
+        fclose(fp1);
+        fclose(fp2);
+        fprintf(stdout,"Max dimesion excedeed\n");
+        exit(3);
+    }
+
+
 
     //restante da matriz 1
     M1 = (int*)malloc(m1*n1*sizeof(int));
@@ -181,34 +194,42 @@ void threadMain(void *logical_id){
 
 int main(int argc, char **argv){
 
-    pthread_t threads[MAX_THREADS];
+    pthread_t threads[MAX_THREADS];    
     int i;
     struct timeval tempoInicioExecucao,tempoFimExecucao;
     useconds_t delay=100*1000; //100ms
+    char * PATH_1,*PATH_2;
    
-    if(argc < 2){
-        fprintf(stdout,"uso: matrizes_threads[NUMERO_THREADS]\n");
+    if(argc < 4){
+        fprintf(stdout,"uso: matrizes_threads <NUMERO_THREADS> <arquivo_matriz_1> <arquivo_matriz_2>\n");
         exit(0);
     } 
-    
+
+    PATH_1 = argv[2];
+    PATH_2 = argv[3];
+   
+    if((!PATH_1) || (!PATH_2)){
+        fprintf(stdout,"Informe os arquivos que descrevem a matriz\n");
+        exit(3);
+    }
+     
     nThreads = atoi(argv[1]);
     if(nThreads>MAX_THREADS){
-        fprintf(stdout,"Numero maximo de Threads permitidas: %d",MAX_THREADS);
-        exit(0);
+        fprintf(stdout,"Numero maximo de Threads permitidas: %d\n",MAX_THREADS);
+        exit(3);
     
     }
     
     if(nThreads == 0){
         fprintf(stdout,"NUMERO_THREADS > 0\n");
-        exit(0);
+        exit(3);
     }
  
     memset(threads,0,sizeof(pthread_t)*MAX_THREADS);
-    leMatrizesEntrada();
+    leMatrizesEntrada(PATH_1,PATH_2);
     if (nThreads > m1){
         nThreads=m1;
         fprintf(stdout,"Numero de Threads reduzido a 1 para cada linha da matriz.\n\n");
-        //exit(0); 
     }        
 
     nLinhasPorThread=m1/nThreads;

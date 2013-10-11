@@ -45,10 +45,9 @@ void printaMatriz(int *M,int m,int n){
     }
 }
 
-void leMatrizesEntrada(){
+void leMatrizesEntrada(char * PATH1,char*PATH2){
     FILE * fp1,*fp2;
-    char PATH1[]="t1/in1.txt";
-    char PATH2[]="t1/in2.txt";
+    
     fp1 = fopen(PATH1,"r");
     
     if (!fp1) {
@@ -72,6 +71,11 @@ void leMatrizesEntrada(){
     n1 = atoi(strtok(NULL," "));
     if (DEBUG) fprintf(stdout,"n1: %d\n",n1);
 
+    if(n1>MAX_DIMENSION){
+        fclose(fp1);
+        fprintf(stdout,"Max dimesion excedeed\n");
+        exit(3);
+    }
 
     //matriz 2
     fp2 = fopen(PATH2,"r");
@@ -100,6 +104,12 @@ void leMatrizesEntrada(){
         exit(0);
     }
 
+    if(n2>MAX_DIMENSION){
+        fclose(fp1);
+        fclose(fp2);
+        fprintf(stdout,"Max dimesion excedeed\n");
+        exit(3);
+    }
     //restante da matriz 1
     M1 = (int*)malloc(m1*n1*sizeof(int));
     int i1=0,j1=0;
@@ -173,32 +183,39 @@ int main(int argc, char **argv){
     pid_t pid;
     int i;
     struct timeval tempoInicioExecucao,tempoFimExecucao;
-    time_t t1,t2;
+    char * PATH_1,*PATH_2;
    
-    if(argc < 2){
-        fprintf(stdout,"uso: matrizes_processos [NUMERO_PROCESSOS]\n");
+    if(argc < 4){
+        fprintf(stdout,"uso: matrizes_processos [NUMERO_PROCESSOS] <arquivo_matriz_1> <arquivo_matriz_2>\n");
         exit(0);
     } 
-    
+ 
+    PATH_1 = argv[2];
+    PATH_2 = argv[3];
+   
+    if((!PATH_1) || (!PATH_2)){
+        fprintf(stdout,"Informe os arquivos que descrevem a matriz\n");
+        exit(3);
+    }
+     
+ 
     nProcessos = atoi(argv[1]);
     if(nProcessos>MAX_PROCESSOS){
-        fprintf(stdout,"Numero maximo de Processos permitidos: %d",MAX_PROCESSOS);
-        exit(0);
+        fprintf(stdout,"Numero maximo de Processos permitidos: %d\n",MAX_PROCESSOS);
+        exit(3);
     
     }
     
     if(nProcessos == 0){
         fprintf(stdout,"NUMERO_PROCESSOS > 0\n");
-        exit(0);
+        exit(3);
     }
  
     memset(pid_filhos,0,sizeof(pid));
-    leMatrizesEntrada();
+    leMatrizesEntrada(PATH_1,PATH_2);
     if (nProcessos >= m1){
         nProcessos=m1;
         fprintf(stdout,"Numero de Processos reduzido a 1 para cada linha da matriz.\n\n");
-        //exit(0); 
-    
     }        
 
     nLinhasPorProcesso=m1/nProcessos;
