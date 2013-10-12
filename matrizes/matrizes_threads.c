@@ -20,6 +20,8 @@ Tambem foi utilizada uma estrutura de memoria compartilhada.
 #include <sys/stat.h>
 #include <errno.h>
 #include <time.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #define MAX_DIMENSION 200
 #define MAX_THREADS 30
 #define DEBUG 0
@@ -200,6 +202,7 @@ int main(int argc, char **argv){
     struct rusage tempoInicioExecucao,tempoFimExecucao;
     useconds_t delay=100*1000; //100ms
     char * PATH_1,*PATH_2;
+    clock_t t1,t2;
    
     if(argc < 4){
         fprintf(stdout,"uso: matrizes_threads <NUMERO_THREADS> <arquivo_matriz_1> <arquivo_matriz_2>\n");
@@ -240,6 +243,7 @@ int main(int argc, char **argv){
     n3=n2;
     M3 = (int*)malloc(sizeof(int)*m3*n3);
     memset(M3,0,sizeof(int)*m3*n3);
+    t1=clock();
     //executa os nThreads filhos, tomando nota do tempo
 
     for(i=0;i<nThreads;i++){
@@ -252,7 +256,9 @@ int main(int argc, char **argv){
 
     //Termino da execucao dos filhos
     //Termino da execucao dos filhos
-    getrusage(RUSAGE_SELF,&tempoFimExecucao);
+    //getrusage(RUSAGE_SELF,&tempoFimExecucao);
+    
+    t2=clock();
     //imprime estatistica
     if(DEBUG){
         fprintf(stdout,"M1\n");
@@ -262,7 +268,8 @@ int main(int argc, char **argv){
         fprintf(stdout,"\n = \n\nM3\n"); 
         printaMatriz(M3,m3,n3);
     }
-    fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",tempoFimExecucao.ru_utime.tv_usec);
+    //fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",tempoFimExecucao.ru_utime.tv_usec);
+    fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",t2-t1);
     return 0;
 
 }

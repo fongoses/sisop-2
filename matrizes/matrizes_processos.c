@@ -19,6 +19,7 @@ Tambem foi utilizada uma estrutura de memoria compartilhada.
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <time.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #define MAX_DIMENSION 200
@@ -186,6 +187,7 @@ int main(int argc, char **argv){
     int i;
     struct rusage tempoInicioExecucao,tempoFimExecucao;
     char * PATH_1,*PATH_2;
+    clock_t t1,t2;
    
     if(argc < 4){
         fprintf(stdout,"uso: matrizes_processos [NUMERO_PROCESSOS] <arquivo_matriz_1> <arquivo_matriz_2>\n");
@@ -234,7 +236,7 @@ int main(int argc, char **argv){
         exit(0);
     }
     memset(sharedMemory,0,segmentSize);
-    
+    t1 = clock();
     //executa os nProcessos filhos, tomando nota do tempo
     for(i=0;i<nProcessos;i++){
         pid = fork();
@@ -261,7 +263,8 @@ int main(int argc, char **argv){
         waitpid(pid_filhos[i],0,0);
   
     //Termino da execucao dos filhos
-    getrusage(RUSAGE_SELF,&tempoFimExecucao);
+    //getrusage(RUSAGE_SELF,&tempoFimExecucao);
+    t2=clock();
     //imprime estatistica
     if(DEBUG){
         fprintf(stdout,"M1\n");
@@ -271,6 +274,7 @@ int main(int argc, char **argv){
         fprintf(stdout,"\n = \n\nM3\n"); 
         printaMatriz((int*)sharedMemory,m3,n3);
     }
-    fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",tempoFimExecucao.ru_utime.tv_usec);
+    //fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",tempoFimExecucao.ru_utime.tv_usec);
+    fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",t2-t1);
     return 0;
 }
