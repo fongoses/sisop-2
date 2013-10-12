@@ -19,10 +19,11 @@ Tambem foi utilizada uma estrutura de memoria compartilhada.
 #include <sys/shm.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include <time.h>
-#define MAX_DIMENSION 30
-#define MAX_PROCESSOS 10
-#define DEBUG 1
+#include <sys/time.h>
+#include <sys/resource.h>
+#define MAX_DIMENSION 200
+#define MAX_PROCESSOS 30
+#define DEBUG 0
 int m1,n1,m2,n2,m3,n3;
 int *M1,*M2;
 int N_THREADS=0;
@@ -56,16 +57,17 @@ void leMatrizesEntrada(char * PATH1,char*PATH2){
     }
 
     char * token;
-    char linha[MAX_DIMENSION];
+    int lineDimension = MAX_DIMENSION*3;
+    char linha[lineDimension]; //considerando espacos entre as linhas, no maximo temos 3* a dimensao
 
     //indices da matriz 1
-    fgets(linha,MAX_DIMENSION,fp1); //1linha
+    fgets(linha,lineDimension,fp1); //1linha
     strtok(linha," ");
     strtok(NULL," ");
     m1 = atoi(strtok(NULL," "));
     if (DEBUG)fprintf(stdout,"m1: %d\n",m1);
 
-    fgets(linha,MAX_DIMENSION,fp1); //2linha
+    fgets(linha,lineDimension,fp1); //2linha
     strtok(linha," ");
     strtok(NULL," ");
     n1 = atoi(strtok(NULL," "));
@@ -85,23 +87,23 @@ void leMatrizesEntrada(char * PATH1,char*PATH2){
     }
    
     //indices da matriz 2
-    fgets(linha,MAX_DIMENSION,fp2); //1linha
+    fgets(linha,lineDimension,fp2); //1linha
     strtok(linha," ");
     strtok(NULL," ");
     m2 = atoi(strtok(NULL," "));
-    //fprintf(stdout,"m2: %d\n",m2);
+    if(DEBUG)fprintf(stdout,"m2: %d\n",m2);
 
-    fgets(linha,MAX_DIMENSION,fp2); //2linha
+    fgets(linha,lineDimension,fp2); //2linha
     strtok(linha," ");
     strtok(NULL," ");
     n2 = atoi(strtok(NULL," "));
-    //fprintf(stdout,"n2: %d\n",n2);
+    if(DEBUG)fprintf(stdout,"n2: %d\n",n2);
     
     if(n1!=m2){
         fprintf(stdout,"Error: different dimensions\n");
         fclose(fp1);
         fclose(fp2);
-        exit(0);
+        exit(3);
     }
 
     if(n2>MAX_DIMENSION){
@@ -113,10 +115,10 @@ void leMatrizesEntrada(char * PATH1,char*PATH2){
     //restante da matriz 1
     M1 = (int*)malloc(m1*n1*sizeof(int));
     int i1=0,j1=0;
-    while(fgets(linha,MAX_DIMENSION,fp1) != NULL){        
+    while(fgets(linha,lineDimension*3,fp1) != NULL){        
         token = strtok(linha," ");       
         while(token){ 
-            //fprintf(stdout,"Token: %s\n",token);
+            //fprintf(stdout,"Token: M1[%d,%d]=%s\n",i1,j1,token);
             M1[i1*n1+ j1]=atoi(token);            
             token=strtok(NULL," ");
             j1++;
@@ -126,15 +128,15 @@ void leMatrizesEntrada(char * PATH1,char*PATH2){
     }
     fclose(fp1);
 
-    memset(linha,0,MAX_DIMENSION);
+    memset(linha,0,lineDimension);
 
     //restante da matriz 2 
     M2 = (int*)malloc(m2*n2*sizeof(int));
     int i2=0,j2=0;
-    while(fgets(linha,MAX_DIMENSION,fp2) != NULL){        
+    while(fgets(linha,lineDimension,fp2) != NULL){        
         token = strtok(linha," "); 
         while(token){ 
-            //fprintf(stdout,"Token: %s\n",token);
+            //fprintf(stdout,"Token: M2[%d,%d]=%s\n",i2,j2,token);
             M2[i2*n2+j2]=atoi(token);            
             token=strtok(NULL," ");
             j2++;
@@ -182,7 +184,7 @@ int main(int argc, char **argv){
     pid_t pid_filhos[MAX_PROCESSOS];
     pid_t pid;
     int i;
-    struct timeval tempoInicioExecucao,tempoFimExecucao;
+    struct rusage tempoInicioExecucao,tempoFimExecucao;
     char * PATH_1,*PATH_2;
    
     if(argc < 4){
@@ -234,7 +236,6 @@ int main(int argc, char **argv){
     memset(sharedMemory,0,segmentSize);
     
     //executa os nProcessos filhos, tomando nota do tempo
-    gettimeofday(&tempoInicioExecucao);
     for(i=0;i<nProcessos;i++){
         pid = fork();
         if (pid <0) exit(0); //fork falhou
@@ -260,15 +261,16 @@ int main(int argc, char **argv){
         waitpid(pid_filhos[i],0,0);
   
     //Termino da execucao dos filhos
-    gettimeofday(&tempoFimExecucao);
-    
+    getrusage(RUSAGE_SELF,&tempoFimExecucao);
     //imprime estatistica
-    fprintf(stdout,"M1\n");
-    printaMatriz(M1,m1,n1);
-    fprintf(stdout,"\n X \n\nM2\n"); 
-    printaMatriz(M2,m2,n2);
-    fprintf(stdout,"\n = \n\nM3\n"); 
-    printaMatriz((int*)sharedMemory,m3,n3);
-    fprintf(stdout,"\nTempo total da execucao(s:us): %d:%d\n\n",(int)(tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec),abs(tempoFimExecucao.tv_usec - tempoInicioExecucao.tv_usec));
+    if(DEBUG){
+        fprintf(stdout,"M1\n");
+        printaMatriz(M1,m1,n1);
+        fprintf(stdout,"\n X \n\nM2\n"); 
+        printaMatriz(M2,m2,n2);
+        fprintf(stdout,"\n = \n\nM3\n"); 
+        printaMatriz((int*)sharedMemory,m3,n3);
+    }
+    fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",tempoFimExecucao.ru_utime.tv_usec);
     return 0;
 }
