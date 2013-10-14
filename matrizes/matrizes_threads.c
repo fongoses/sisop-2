@@ -199,7 +199,7 @@ int main(int argc, char **argv){
 
     pthread_t threads[MAX_THREADS];    
     int i;
-    struct rusage tempoInicioExecucao,tempoFimExecucao;
+    struct timeval tempoInicioExecucao,tempoFimExecucao;
     useconds_t delay=100*1000; //100ms
     char * PATH_1,*PATH_2;
     clock_t t1,t2;
@@ -243,12 +243,13 @@ int main(int argc, char **argv){
     n3=n2;
     M3 = (int*)malloc(sizeof(int)*m3*n3);
     memset(M3,0,sizeof(int)*m3*n3);
-    t1=clock();
+    //t1=clock();
+
+    gettimeofday(&tempoInicioExecucao,NULL);
     //executa os nThreads filhos, tomando nota do tempo
 
     for(i=0;i<nThreads;i++){
         pthread_create(&threads[i],NULL,threadMain,(void*)&i);
-        usleep(delay); //dorme um pouco, para n incrementar o i antes da thread inicializar
     }
     
     for(i=0;i<nThreads;i++)
@@ -258,7 +259,8 @@ int main(int argc, char **argv){
     //Termino da execucao dos filhos
     //getrusage(RUSAGE_SELF,&tempoFimExecucao);
     
-    t2=clock();
+    //t2=clock();
+    gettimeofday(&tempoFimExecucao,NULL);
     //imprime estatistica
     if(DEBUG){
         fprintf(stdout,"M1\n");
@@ -268,8 +270,8 @@ int main(int argc, char **argv){
         fprintf(stdout,"\n = \n\nM3\n"); 
         printaMatriz(M3,m3,n3);
     }
-    //fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",tempoFimExecucao.ru_utime.tv_usec);
-    fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",t2-t1);
+
+    fprintf(stdout,"\nTempo total da execucao(s:us): %ld:%ld\n\n",tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec,tempoFimExecucao.tv_usec-tempoInicioExecucao.tv_usec);
     return 0;
 
 }

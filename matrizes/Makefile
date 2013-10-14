@@ -1,4 +1,3 @@
-
 all: matrizes_processos matrizes_threads
 
 matrizes_processos: matrizes_processos.c

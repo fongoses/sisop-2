@@ -177,6 +177,7 @@ void multiplica(int start,int end){
 }
 
 
+
 int main(int argc, char **argv){
 
     int nProcessos;    
@@ -185,7 +186,7 @@ int main(int argc, char **argv){
     pid_t pid_filhos[MAX_PROCESSOS];
     pid_t pid;
     int i;
-    struct rusage tempoInicioExecucao,tempoFimExecucao;
+    struct timeval tempoInicioExecucao,tempoFimExecucao;
     char * PATH_1,*PATH_2;
     clock_t t1,t2;
    
@@ -236,7 +237,8 @@ int main(int argc, char **argv){
         exit(0);
     }
     memset(sharedMemory,0,segmentSize);
-    t1 = clock();
+    //t1 = clock();
+    gettimeofday(&tempoInicioExecucao,NULL);
     //executa os nProcessos filhos, tomando nota do tempo
     for(i=0;i<nProcessos;i++){
         pid = fork();
@@ -244,7 +246,6 @@ int main(int argc, char **argv){
         if (pid == 0) {
             //Codigo do filho
     
-            sharedMemory = shmat(sharedSegmentId,NULL,0);
             if(i<nProcessos-1) multiplica(i*nLinhasPorProcesso,i*nLinhasPorProcesso + nLinhasPorProcesso);
             else multiplica(i*nLinhasPorProcesso,i*nLinhasPorProcesso + nLinhasPorProcesso+linhasRestantes);
 
@@ -263,8 +264,8 @@ int main(int argc, char **argv){
         waitpid(pid_filhos[i],0,0);
   
     //Termino da execucao dos filhos
-    //getrusage(RUSAGE_SELF,&tempoFimExecucao);
-    t2=clock();
+    gettimeofday(&tempoFimExecucao,NULL);
+    //t2=clock();
     //imprime estatistica
     if(DEBUG){
         fprintf(stdout,"M1\n");
@@ -274,7 +275,7 @@ int main(int argc, char **argv){
         fprintf(stdout,"\n = \n\nM3\n"); 
         printaMatriz((int*)sharedMemory,m3,n3);
     }
-    //fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",tempoFimExecucao.ru_utime.tv_usec);
-    fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",t2-t1);
+    fprintf(stdout,"\nTempo total da execucao(s:us): %ld:%ld\n\n",tempoFimExecucao.tv_sec-tempoInicioExecucao.tv_sec,tempoFimExecucao.tv_usec-tempoInicioExecucao.tv_usec);
+    //fprintf(stdout,"\nTempo total da execucao(us): %ld\n\n",t2-t1);
     return 0;
 }
