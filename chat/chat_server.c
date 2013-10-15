@@ -25,6 +25,7 @@ Versao servidor
 #define MAX_CLIENTES 10
 #define PORTA_APLICACAO 2709
 #define MAX_SALAS 10
+#define MAX_NICK 15
 
 struct sala {
     int id;
@@ -50,12 +51,10 @@ void inicializaSalas(){
 //threa para gerencia de cada um dos clientes
 void * gerenteCliente(void * sock){
 
-    int socket = *(int*) sock;
-    
-//    sem_wait(&semaforoGarfos[id]);
+////    int socket = *(int*) sock;
+     
     while(1){
 
-        fprintf(stdout,"Oi sou uma thread que gerencia o cliente %d\n",socket);
         sleep(1);
 
 
@@ -64,7 +63,6 @@ void * gerenteCliente(void * sock){
     }
 
 
-//   sem_post(&semaforoGarfos[id]);
 
 }
 

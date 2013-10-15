@@ -200,8 +200,7 @@ void trataRespostaComando(char * mensagem){
         limpaTelaPrincipal();
         exibeMensagemSala(); 
         linhaAtual=1;
-        colunaAtual=0;        
-
+        colunaAtual=0;  
         return;
     }
 
@@ -270,18 +269,23 @@ void * envia(void * sock){
         mvgetnstr(linhaMax-2,sizeof(stringMensagem),mensagem,MAX_MENSAGEM);
     
         if ( mensagem[0] == '/') executaComando(socket,mensagem);
-        else{              
-            //envia
-            bzero(mensagemEnviada,sizeof(mensagemEnviada));
-            strcpy(mensagemEnviada,nickAtual);
-            strcat(mensagemEnviada,": ");
-            strcat(mensagemEnviada,mensagem);
-            n=write(socketServer, mensagem, strlen(mensagemEnviada));
-           
-            if (n>0){
-                ecoaMensagemTela(mensagem);
+        else{      
+            if(salaAtual < 0){
+                ecoaMensagemControleTela("Voce nao esta em nenhum canal.");
+            }else{       
+                //envia
+                bzero(mensagemEnviada,sizeof(mensagemEnviada));
+                strcpy(mensagemEnviada,nickAtual);
+                strcat(mensagemEnviada,": ");
+                strcat(mensagemEnviada,mensagem);
+                n=write(socketServer, mensagem, strlen(mensagemEnviada));
+               
+                if (n>0){
+                    ecoaMensagemTela(mensagem);
+                }
             }
         }
+
         limpaAreaMensagem();
         sem_post(&semaforoSC);
     }
@@ -339,7 +343,6 @@ int main(int argc, char *argv[])
     salaAtual=-1;
     
 
- 
     //cria threads de envio e recebimento
     pthread_create(&threadEnvia,NULL,envia,(void*)&socketServer);
     pthread_create(&threadRecebe,NULL,recebe,(void*)&socketServer);
