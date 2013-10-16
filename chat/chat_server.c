@@ -180,6 +180,7 @@ void * gerenteCliente(void * sock){
      
     while(1){
 
+        bzero(bufferMensagemRecebida,MAX_MENSAGEM);
         //le mensagem recebida
         //aio_read(&acb);
         //n=acb.aio_offset;

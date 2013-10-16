@@ -290,7 +290,7 @@ void * envia(void * sock){
                 ecoaMensagemControleTela("Voce nao esta em nenhuma sala.");
             }else{       
                 //envia
-                bzero(mensagemEnviada,sizeof(mensagemEnviada));
+                bzero(mensagemEnviada,MAX_MENSAGEM);
                 strcpy(mensagemEnviada,nickAtual);
                 strcat(mensagemEnviada,": ");
                 strcat(mensagemEnviada,mensagem);
