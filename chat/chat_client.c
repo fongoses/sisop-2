@@ -64,6 +64,12 @@ void exibeMensagemSala(){
     refresh();
 }
 
+void exibeStringMensagemRodape(){
+
+        mvprintw(linhaStringMensagem,0,"%s",stringMensagem);
+        refresh();
+}
+
 void limpaTelaPrincipal(){
     int i;
     for(i=0;i<linhaBarraHorizontal;i++){
@@ -71,6 +77,7 @@ void limpaTelaPrincipal(){
     }
     linhaAtual=0;
     colunaAtual=0; 
+    refresh();
 }
 
 void aumentaLinhaTelaPrincipal(){
@@ -113,9 +120,7 @@ void exibeMensagemErro(char * mensagem){
     limpaAreaMensagem();
     mvprintw(linhaStringMensagem,strlen(stringMensagem)+1,mensagem);
     refresh();    
-    getchar();
-    limpaAreaMensagem();
-
+    
 }
 
 void alteraNick(char*novoNick){
@@ -159,7 +164,10 @@ void executaComando(int socket, char * mensagem){
     if(strcmp(comando,"/nick")==0){
         //altera nick - realizado localmente
         char * nick = strtok_r(NULL," ",&savedptr);
-        alteraNick(nick);
+        
+        sem_wait(&semaforoSC);
+        alteraNick(nick);        
+        sem_post(&semaforoSC);
         return;
     }
 
@@ -167,7 +175,27 @@ void executaComando(int socket, char * mensagem){
         //cria uma sala
         char * sala_s=strtok_r(NULL," ",&savedptr);
         if(!sala_s) {
+            sem_wait(&semaforoSC);
             ecoaMensagemControleTela("sintaxe invalida.");
+            sem_post(&semaforoSC);
+            return;
+        }
+               
+        sem_wait(&semaforoSC);
+        salaAtual=atoi(sala_s);
+        sem_post(&semaforoSC);
+        write(socket,mensagemOriginal,strlen(mensagemOriginal));
+        //resposta do comando eh tratata em recebeDados        
+        return;
+    }
+
+    if(strcmp(comando,"/join") == 0){
+        //entra em uma sala
+        char * sala_s=strtok_r(NULL," ",&savedptr);
+        if(!sala_s) {
+            sem_wait(&semaforoSC);
+            ecoaMensagemControleTela("sintaxe invalida.");
+            sem_post(&semaforoSC);
             return;
         }
         write(socket,mensagemOriginal,strlen(mensagemOriginal));
@@ -175,24 +203,40 @@ void executaComando(int socket, char * mensagem){
         return;
     }
 
-    if(strcmp(comando,"/join") == 0){
-        //entre em uma sala
-        return;
-    }
-
     if(strcmp(comando,"/leave") == 0){
+        sem_wait(&semaforoSC);
         //sai de uma sala
+        if(salaAtual < 0){
+            ecoaMensagemControleTela("voce nao esta em nenhuma sala.");
+            sem_post(&semaforoSC);
+            return;
+        }        
+        sem_post(&semaforoSC);
+        write(socket,mensagemOriginal,strlen(mensagemOriginal));
         return;
     }
 
     if(strcmp(comando,"/close") == 0){
         //fecha conexoes e programa
+        write(socket,mensagemOriginal,strlen(mensagemOriginal));        
+        return;
+    }
+ 
+    if(strcmp(comando,"/help") == 0){
+        //fecha conexoes e programa
+        
+        sem_wait(&semaforoSC);
+        ecoaMensagemControleTela(stringServidor_Help);
+        sem_post(&semaforoSC);
         return;
     }
     
    
     //comando nao reconhecido
+
+    sem_wait(&semaforoSC);
     ecoaMensagemControleTela("Comando nao reconhecido."); 
+    sem_post(&semaforoSC);
 
 }
 
@@ -206,31 +250,71 @@ void trataRespostaComando(char * mensagem){
         alteraNick(nick);
         return;
     }*/
-
     if(strcmp(comando,"/create") == 0){
-        salaAtual=atoi(strtok(NULL," "));
+        
+        sem_wait(&semaforoSC);
+        char *sala_s = strtok(NULL," ");
+        if(!sala_s) return;
+        
+        int salatemp=atoi(sala_s);
+        if (salatemp<0) return;
+        salaAtual=salatemp;
         
         //Cria sala
         limpaTelaPrincipal();
         exibeMensagemSala(); 
-        linhaAtual=1;
+        limpaAreaMensagem();
+        exibeStringMensagemRodape();
+        linhaAtual=0;
         colunaAtual=0;  
-
+        
+        sem_post(&semaforoSC);
         return;
     }
 
     if(strcmp(comando,"/join") == 0){
         //entre em uma sala
+        sem_wait(&semaforoSC);
+        char *sala_s = strtok(NULL," ");
+        if(!sala_s) return;
+       
+        int salatemp=atoi(sala_s);
+        if (salatemp<0) return;
+        salaAtual=salatemp;
+ 
+        
+        //Entra na sala
+        limpaTelaPrincipal();
+        exibeMensagemSala(); 
+        limpaAreaMensagem();
+        exibeStringMensagemRodape();
+        linhaAtual=0;
+        colunaAtual=0;  
+        
+        sem_post(&semaforoSC);
+     
         return;
     }
 
     if(strcmp(comando,"/leave") == 0){
         //sai de uma sala
+        
+        sem_wait(&semaforoSC);
+        limpaTelaPrincipal();
+        exibeMensagemServidor();
+        limpaAreaMensagem();
+        linhaBarraHorizontal=linhaStringMensagem-1;
+        mvhline(linhaBarraHorizontal,0,'=',colunaMax);
+        exibeStringMensagemRodape();
+        linhaAtual=8;
+ 
+        sem_post(&semaforoSC);
         return;
     }
 
     if(strcmp(comando,"/close") == 0){
         //fecha conexoes e programa
+        exit(0);
         return;
     }
     
@@ -264,7 +348,12 @@ void * recebe(void * sock){
         if(n>0){
             //ecoaMensagemTela("Mensagem recebida...");
             if(resposta[0]=='/') trataRespostaComando(resposta);
-            else ecoaMensagemTela(resposta);
+            else {
+            
+                sem_wait(&semaforoSC);
+                ecoaMensagemTela(resposta);
+                sem_post(&semaforoSC);
+            }
         }
 
         //sem_post(&semaforoSC);
@@ -282,18 +371,19 @@ void * envia(void * sock){
 
     while(1){    
         sem_wait(&semaforoSC);
-        mvprintw(linhaMax-2,0,"%s",stringMensagem);
+        exibeStringMensagemRodape();
         sem_post(&semaforoSC);
         
         bzero(mensagem, MAX_MENSAGEM);
         mvgetnstr(linhaMax-2,sizeof(stringMensagem),mensagem,MAX_MENSAGEM);
         
-        //sem_wait(&semaforoSC);
     
         if ( mensagem[0] == '/') executaComando(socket,mensagem);
         else{      
             if(salaAtual < 0){
+                sem_wait(&semaforoSC);
                 ecoaMensagemControleTela("Voce nao esta em nenhuma sala.");
+                sem_post(&semaforoSC);
             }else{       
                 //envia
                 bzero(mensagemEnviada,MAX_MENSAGEM);
@@ -302,12 +392,17 @@ void * envia(void * sock){
                 strcat(mensagemEnviada,mensagem);
                 n=write(socket, mensagem, strlen(mensagemEnviada));
                 if (n>0){
+                    
+                    sem_wait(&semaforoSC);
                     ecoaMensagemTela(mensagem);
+                    sem_post(&semaforoSC);
                 }
             }
         }
 
+        sem_wait(&semaforoSC);
         limpaAreaMensagem();
+        sem_post(&semaforoSC);
         //sem_post(&semaforoSC);
     }
     exit(0);
@@ -331,8 +426,8 @@ int main(int argc, char *argv[])
     }
  
     if(argc>=3){
-        porta=atoi(argv[1]);
-        hostname=argv[2];
+        hostname=argv[1];
+        porta=atoi(argv[2]);
         if(porta<0)porta=PORTA_APLICACAO;
     }else {
         porta=PORTA_APLICACAO;

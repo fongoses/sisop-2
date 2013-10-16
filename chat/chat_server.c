@@ -46,6 +46,10 @@ sem_t semaforosSalas[MAX_SALAS]; //1 semaforo para cada sala
 //strings de resposta aos comandos do cliente:
 char erroSalaCreate[]="/Erro: numero de sala invalido";
 char createSucesso[]="/create %d";
+char erroSalaJoin[]="/Erro: nao foi possivel entra na sala";
+char joinSucesso[]="/join %d";
+char erroSalaLeave[]="/Erro: nao foi possivel processar o leave";
+char leaveSucesso[]="/leave %d";
 
 
 void limpaBufferMensagemSala(int id){
@@ -87,7 +91,7 @@ void enviaMensagemControle(int socket, char *mensagem,int controle){
 
 }
 
-void executaComando(int socket,char * mensagem){
+void executaComando(int socket,char * mensagem,int * salaCliente){
 
     char *savedptr=0;
     char mensagemOriginal[MAX_MENSAGEM];
@@ -118,7 +122,7 @@ void executaComando(int socket,char * mensagem){
         if ((sala<0) || (sala>=MAX_SALAS )) {
             //envia mensagem ao cliente.
             fprintf(stdout,"Erro ao criar sala %d\n",sala);
-            //write(socket,erroSalaCreate,sizeof(erroSalaCreate));
+            write(socket,erroSalaCreate,strlen(erroSalaCreate));
             return;
         }
         
@@ -128,24 +132,84 @@ void executaComando(int socket,char * mensagem){
             //cria sala
             salas[sala].nParticipantes=1;            
             enviaMensagemControle(socket,createSucesso,sala);    
-            fprintf(stdout,"Sala %d criada.\n",sala); 
+            fprintf(stdout,"Sala %d criada.\n",sala);
+            *salaCliente =sala;
         }
         sem_post(&semaforosSalas[sala]);
         return;
     }
 
     if(strcmp(comando,"/join") == 0){
-        //entre em uma sala
+        int sala;
+        char *sala_s=strtok_r(NULL," ",&savedptr);
+        if(!sala_s) sala=-1;
+        else sala=atoi(sala_s);
+        
+        
+        if ((sala<0) || (sala>=MAX_SALAS )) {
+            //envia mensagem ao cliente.
+            fprintf(stdout,"Erro ao entrar na sala %d\n",sala);
+            write(socket,erroSalaJoin,strlen(erroSalaJoin));
+            return;
+        }
+        
+        
+        sem_wait(&semaforosSalas[sala]);
+        if(salas[sala].nParticipantes>0){ 
+            //entra na sala
+            salas[sala].nParticipantes++;            
+            enviaMensagemControle(socket,joinSucesso,sala);    
+            fprintf(stdout,"Sala %d recebeu um novo membro.\n",sala); 
+        }else{
+            fprintf(stdout,"Sala %d nao existente\n",sala);
+            write(socket,erroSalaJoin,strlen(erroSalaJoin));
+        
+        }
+           
+        sem_post(&semaforosSalas[sala]);
         return;
+
     }
 
     if(strcmp(comando,"/leave") == 0){
+    
         //sai de uma sala
+        if ((*salaCliente<0) || (*salaCliente>=MAX_SALAS )) {
+            //envia mensagem ao cliente.
+            fprintf(stdout,"Usuario nao esta na sala %d\n",*salaCliente);
+            write(socket,erroSalaLeave,strlen(erroSalaLeave));
+            return;
+        }
+        
+        sem_wait(&semaforosSalas[*salaCliente]);
+
+        //entra na sala
+        salas[*salaCliente].nParticipantes--;          
+        enviaMensagemControle(socket,leaveSucesso,*salaCliente);    
+        fprintf(stdout,"Sala %d perde um participante.\n",*salaCliente);
+          
+        sem_post(&semaforosSalas[*salaCliente]);
         return;
     }
 
     if(strcmp(comando,"/close") == 0){
         //fecha conexoes e programa
+        //sai de uma sala
+        if ((*salaCliente<0) || (*salaCliente>=MAX_SALAS )) {
+            //envia mensagem ao cliente.
+            fprintf(stdout,"Erro: Usuario nao esta na sala %d\n",*salaCliente);
+            exit(0);
+            return;
+        }
+        
+        sem_wait(&semaforosSalas[*salaCliente]);
+
+        //entra na sala
+        salas[*salaCliente].nParticipantes--;          
+        enviaMensagemControle(socket,leaveSucesso,*salaCliente);    
+        fprintf(stdout,"Sala %d perde um participante.\n",*salaCliente);
+        sem_post(&semaforosSalas[*salaCliente]);
+ 
         return;
     }
     
@@ -154,8 +218,6 @@ void executaComando(int socket,char * mensagem){
     //exibeMensagemErro("Comando nao reconhecido"); 
 
 }
-
-
 
 
 //threa para gerencia de cada um dos clientes
@@ -191,8 +253,8 @@ void * gerenteCliente(void * sock){
             //fprintf(stdout,"Oi sou uma thread cliente:\n%s\n",bufferMensagemRecebida);
             
             if(bufferMensagemRecebida[0]=='/') 
-                executaComando(socket,bufferMensagemRecebida);
-             else{/*
+                executaComando(socket,bufferMensagemRecebida,&sala);
+             else{/*DESCOMENTAR E VER PQ NAO FUNFA
                 if(sala>=0){
                     //atualiza cliente 
                     sem_wait(&semaforosSalas[sala]);
