@@ -319,15 +319,16 @@ void * recebe(void * args){
                             fprintf(stdout,"numero seq servidor: %d\n",salas[sala].numeroSequenciaMensagemAtual);
                             //bzero(bufferMensagemRecebida,MAX_MENSAGEM); 
                             fprintf(stdout,"Gravei uma mensagem no servidor\n");
+    
+                            threadSala[id].nSeq=numeroSequenciaCliente;
                             sem_post(&semaforosSalas[sala]);
                             sem_wait(&semaforosThreads[id]);
-                            threadSala[id].nSeq=numeroSequenciaCliente;
                             sem_post(&semaforosThreads[id]);
 
                             break;
                         }
     
-                        fprintf(stdout,"esperando para gravar no servidor %d\n",salas[sala].contadorLeituras);
+                        //fprintf(stdout,"esperando para gravar no servidor %d\n",salas[sala].contadorLeituras);
                         sem_post(&semaforosSalas[sala]);
                     
                     }

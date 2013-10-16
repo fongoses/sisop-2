@@ -354,6 +354,8 @@ void * recebe(void * sock){
             
                 sem_wait(&semaforoSC);
                 ecoaMensagemTela(resposta);
+                limpaAreaMensagem();
+                exibeStringMensagemRodape();
                 sem_post(&semaforoSC);
             }
         }
@@ -395,17 +397,18 @@ void * envia(void * sock){
                 n=write(socket, mensagem, strlen(mensagemEnviada));
                 if (n>0){
                     
-                    sem_wait(&semaforoSC);
-                    ecoaMensagemTela(mensagem);
-                    sem_post(&semaforoSC);
+              //      sem_wait(&semaforoSC);
+            //        ecoaMensagemTela(mensagem);
+                //    sem_post(&semaforoSC);
                 }
             }
         }
 
         sem_wait(&semaforoSC);
         limpaAreaMensagem();
+        exibeStringMensagemRodape();
+        
         sem_post(&semaforoSC);
-        //sem_post(&semaforoSC);
     }
     exit(0);
 }
