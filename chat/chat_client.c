@@ -26,7 +26,6 @@ Versao cliente.
 #define MAX_MENSAGEM 60
 #define MAX_NICK 15
 ///////Secao Critica////////////////
-int socketServer;
 //controle da tela
 int linhaAtual,colunaAtual;
 int salaAtual=-1;
@@ -245,27 +244,30 @@ void * recebe(void * sock){
     int n;
     int socket = *(int*)sock;
     char resposta[MAX_MENSAGEM]; //mensagem enviada do servidor para o cliente
-    struct aiocb acb; //struct para leitura assincrona
+    //struct aiocb acb; //struct para leitura assincrona
     
     if (socket < 0)  exit(3);
 
-    bzero((char*)&acb,sizeof(struct aiocb));
-    acb.aio_fildes=socket;
-    acb.aio_buf=resposta;
-    acb.aio_nbytes=MAX_MENSAGEM;
-
+    //bzero((char*)&acb,sizeof(struct aiocb));
+    //acb.aio_fildes=socket;
+    //acb.aio_buf=resposta;
+    //acb.aio_nbytes=MAX_MENSAGEM;
+    
     while(1){
-        sem_wait(&semaforoSC); 
+        //sem_wait(&semaforoSC); 
 
         bzero(resposta,MAX_MENSAGEM);
-        aio_read(&acb);
-        n = acb.aio_offset;
-        if(n>=0){
+        //ecoaMensagemTela("Recebendo resposta...");
+        n=read(socket,resposta,MAX_MENSAGEM);
+        //aio_read(&acb);
+        //n = acb.aio_offset;
+        if(n>0){
+            //ecoaMensagemTela("Mensagem recebida...");
             if(resposta[0]=='/') trataRespostaComando(resposta);
             else ecoaMensagemTela(resposta);
         }
 
-        sem_post(&semaforoSC);
+        //sem_post(&semaforoSC);
     }
     exit(0);
 }
@@ -281,8 +283,12 @@ void * envia(void * sock){
     while(1){    
         sem_wait(&semaforoSC);
         mvprintw(linhaMax-2,0,"%s",stringMensagem);
+        sem_post(&semaforoSC);
+        
         bzero(mensagem, MAX_MENSAGEM);
         mvgetnstr(linhaMax-2,sizeof(stringMensagem),mensagem,MAX_MENSAGEM);
+        
+        //sem_wait(&semaforoSC);
     
         if ( mensagem[0] == '/') executaComando(socket,mensagem);
         else{      
@@ -294,8 +300,7 @@ void * envia(void * sock){
                 strcpy(mensagemEnviada,nickAtual);
                 strcat(mensagemEnviada,": ");
                 strcat(mensagemEnviada,mensagem);
-                n=write(socketServer, mensagem, strlen(mensagemEnviada));
-               
+                n=write(socket, mensagem, strlen(mensagemEnviada));
                 if (n>0){
                     ecoaMensagemTela(mensagem);
                 }
@@ -303,7 +308,7 @@ void * envia(void * sock){
         }
 
         limpaAreaMensagem();
-        sem_post(&semaforoSC);
+        //sem_post(&semaforoSC);
     }
     exit(0);
 }
@@ -317,8 +322,10 @@ int main(int argc, char *argv[])
     char * hostname;
     int porta;
     sem_init(&semaforoSC,0,1);
+    int socketWrite,socketRead;
     
-        if (argc < 2) {
+    
+    if (argc < 2) {
         fprintf(stderr,"uso %s host\n", argv[0]);
         exit(0);
     }
@@ -338,7 +345,7 @@ int main(int argc, char *argv[])
         exit(0);
     }
     
-    if ((socketServer = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
+    if ((socketWrite = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
         printf("Erro na criacao do socket\n");
     
     serv_addr.sin_family = AF_INET;    
@@ -347,12 +354,13 @@ int main(int argc, char *argv[])
     bzero(&(serv_addr.sin_zero), 8);     
     
     
-    if (connect(socketServer,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
+    if (connect(socketWrite,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
         printf("Erro ao conectar\n");
         exit(3);
     }
 
-   
+    socketRead = dup(socketWrite); //duplica o socket, para leitura  
+ 
     //inicializa variaveis da tela
     initscr();
     getmaxyx(stdscr,linhaMax,colunaMax);    
@@ -370,12 +378,13 @@ int main(int argc, char *argv[])
     
 
     //cria threads de envio e recebimento
-    pthread_create(&threadEnvia,NULL,envia,(void*)&socketServer);
-    pthread_create(&threadRecebe,NULL,recebe,(void*)&socketServer);
+    pthread_create(&threadEnvia,NULL,envia,(void*)&socketWrite);
+    pthread_create(&threadRecebe,NULL,recebe,(void*)&socketRead);
     pthread_join(threadEnvia,NULL);
     pthread_join(threadRecebe,NULL);
     
     endwin();
-    close(socketServer);
+    close(socketWrite);
+    close(socketRead);
     return 0;
 }

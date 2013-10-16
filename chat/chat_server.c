@@ -82,6 +82,7 @@ void enviaMensagemControle(int socket, char *mensagem,int controle){
 
     bzero(mensagemEnviada,MAX_MENSAGEM);
     sprintf(mensagemEnviada,mensagem,controle);
+    write(socket,mensagemEnviada,strlen(mensagemEnviada));
 
 
 }
@@ -127,7 +128,7 @@ void executaComando(int socket,char * mensagem){
             //cria sala
             salas[sala].nParticipantes=1;            
             enviaMensagemControle(socket,createSucesso,sala);    
-                fprintf(stdout,"Sala %d criada.\n",sala); 
+            fprintf(stdout,"Sala %d criada.\n",sala); 
         }
         sem_post(&semaforosSalas[sala]);
         return;
