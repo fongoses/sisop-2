@@ -308,7 +308,7 @@ void * recebe(void * args){
                         while(1){
                         sem_wait(&semaforosSalas[sala]);
 
-                        if(salas[sala].contadorLeituras >=0){   
+                        if(salas[sala].contadorLeituras <=0){   
                             fprintf(stdout,"Todos leram a ultima mensagem da sala %d.\n",sala);
                             //atualiza mensagem da sala,e seq do cliente
                             bzero(salas[sala].bufferMensagemAtual,MAX_MENSAGEM);
@@ -323,12 +323,12 @@ void * recebe(void * args){
                             sem_wait(&semaforosThreads[id]);
                             threadSala[id].nSeq=numeroSequenciaCliente;
                             sem_post(&semaforosThreads[id]);
-                            
 
                             break;
                         }
+    
+                        fprintf(stdout,"esperando para gravar no servidor %d\n",salas[sala].contadorLeituras);
                         sem_post(&semaforosSalas[sala]);
-                        //fprintf(stdout,"esperando para gravar no servidor\n");
                     
                     }
 
