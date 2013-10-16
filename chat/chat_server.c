@@ -24,7 +24,7 @@ Versao servidor
 
 #define MAX_MENSAGEM 60
 #define MAX_CLIENTES 10
-#define PORTA_APLICACAO 2709
+#define PORTA_PADRAO 2709
 #define MAX_SALAS 10
 #define MAX_NICK 15
 
@@ -88,10 +88,16 @@ void enviaMensagemControle(int socket, char *mensagem,int controle){
 
 void executaComando(int socket,char * mensagem){
 
-
-    char *comando =strtok(mensagem," ");
+    char *savedptr=0;
+    char mensagemOriginal[MAX_MENSAGEM];
+    char *comando;
     if(socket<0) return;
 
+    bzero(mensagemOriginal,MAX_MENSAGEM);
+    strcpy(mensagemOriginal,mensagem);
+    
+    comando=strtok_r(mensagem," ",&savedptr);
+    
     /* //Nao necessario, tratado locamente 
     if(strcmp(comando,"/nick")==0){
         //altera nick - realizado localmente
@@ -100,20 +106,28 @@ void executaComando(int socket,char * mensagem){
         return;
     }*/
 
-    if(strcmp(comando,"/create") == 0){
 
-        int sala=atoi(strtok(NULL," "));
-        if ((sala<0) || (sala>MAX_SALAS )) {
+    if(strcmp(comando,"/create") == 0){
+        int sala;
+        char *sala_s=strtok_r(NULL," ",&savedptr);
+        if(!sala_s) sala=-1;
+        else sala=atoi(sala_s);
+        
+        
+        if ((sala<0) || (sala>=MAX_SALAS )) {
             //envia mensagem ao cliente.
-            write(socket,erroSalaCreate,sizeof(erroSalaCreate));
+            fprintf(stdout,"Erro ao criar sala %d\n",sala);
+            //write(socket,erroSalaCreate,sizeof(erroSalaCreate));
             return;
         }
+        
         
         sem_wait(&semaforosSalas[sala]);
         if(salas[sala].nParticipantes==0){ 
             //cria sala
             salas[sala].nParticipantes=1;            
             enviaMensagemControle(socket,createSucesso,sala);    
+                fprintf(stdout,"Sala %d criada.\n",sala); 
         }
         sem_post(&semaforosSalas[sala]);
         return;
@@ -162,19 +176,21 @@ void * gerenteCliente(void * sock){
     acb.aio_buf=bufferMensagemRecebida;
     acb.aio_nbytes=MAX_MENSAGEM;
 
+    bzero(bufferMensagemRecebida,MAX_MENSAGEM);
+     
     while(1){
-        bzero(bufferMensagemRecebida,MAX_MENSAGEM);
-        
 
         //le mensagem recebida
-        aio_read(&acb);
-        n=acb.aio_offset;        
-        if(n>=0){
-            fprintf(stdout,"Oi sou uma thread cliente %d\n",socket);
+        //aio_read(&acb);
+        //n=acb.aio_offset;
+        n=read(socket,bufferMensagemRecebida,MAX_MENSAGEM);
+        bufferMensagemRecebida[MAX_MENSAGEM-1]='\0';
+        if(n>0){
+            //fprintf(stdout,"Oi sou uma thread cliente:\n%s\n",bufferMensagemRecebida);
             
             if(bufferMensagemRecebida[0]=='/') 
                 executaComando(socket,bufferMensagemRecebida);
-             else{
+             else{/*
                 if(sala>=0){
                     //atualiza cliente 
                     sem_wait(&semaforosSalas[sala]);
@@ -195,10 +211,11 @@ void * gerenteCliente(void * sock){
                             break;
                         }
                         sem_post(&semaforosSalas[sala]);
+                        bzero(bufferMensagemRecebida,MAX_MENSAGEM);
                     
                     }
 
-                } 
+                } */
              }  
         
         }
@@ -216,36 +233,47 @@ int main(int argc, char *argv[ ]) {
     int socketAplicacao, socketCliente;
     socklen_t clilen;
     struct sockaddr_in serv_addr, cli_addr;
-    
+    int porta=0; 
 
     //inicializacao
-    fprintf(stdout,"teste");
     inicializaSalas();
     memset(threadsClientes,0,sizeof(pthread_t)*MAX_CLIENTES);
     for(i=0;i<MAX_SALAS;i++) 
         sem_init(&semaforosSalas[i],0,1); //exclusao mutua (S=1) na variavel compartilhada 
     
-    if ((socketAplicacao = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
+    if ((socketAplicacao = socket(AF_INET, SOCK_STREAM, 0)) == -1){
         printf("Erro na criacao do socket");
-    
+        exit(3);
+
+    }
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORTA_APLICACAO);
+    if(argc >= 2){
+        porta=atoi(argv[1]);
+        if(porta<0){           
+            porta=PORTA_PADRAO;
+        }
+    }else porta=PORTA_PADRAO;
+
+    serv_addr.sin_port = htons(porta); 
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     bzero(&(serv_addr.sin_zero), 8); 
     clilen = sizeof(struct sockaddr_in);
     
-    if (bind(socketAplicacao, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) 
-        printf("Erro de binding");
+    if (bind(socketAplicacao, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+        printf("Erro de binding\n");
+        close(socketAplicacao);
+        exit(3);
+    }
     
     listen(socketAplicacao, 5);
-    
+    fprintf(stdout,"Ouvindo na porta: %d\n",porta); 
     i=0;
 
     while(1){
         
         //aguarda conexao
         if ((socketCliente = accept(socketAplicacao, (struct sockaddr *) &cli_addr, &clilen)) == -1) 
-            printf("ERROR on accept");
+            printf("Erro em aceitar uma nova conexao\n");
         else {
             if(i>=MAX_CLIENTES) {
                 fprintf(stdout,"Numero maximo de clientes atingido. Ignorando novas conexoes");

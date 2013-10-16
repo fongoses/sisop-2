@@ -145,18 +145,33 @@ void alteraNick(char*novoNick){
 
 }
 void executaComando(int socket, char * mensagem){
-    char *comando =strtok(mensagem," ");
-    
+  
+    char *savedptr=0;
+    char mensagemOriginal[MAX_MENSAGEM];
+    char *comando; 
+
+    if(socket<0) return;
+     
+    bzero(mensagemOriginal,MAX_MENSAGEM);
+    strcpy(mensagemOriginal,mensagem);
+
+    comando=strtok_r(mensagem," ",&savedptr);
+
     if(strcmp(comando,"/nick")==0){
         //altera nick - realizado localmente
-        char * nick = strtok(NULL," ");
+        char * nick = strtok_r(NULL," ",&savedptr);
         alteraNick(nick);
         return;
     }
 
     if(strcmp(comando,"/create") == 0){
         //cria uma sala
-        write(socket,mensagem,sizeof(mensagem));
+        char * sala_s=strtok_r(NULL," ",&savedptr);
+        if(!sala_s) {
+            ecoaMensagemControleTela("sintaxe invalida.");
+            return;
+        }
+        write(socket,mensagemOriginal,strlen(mensagemOriginal));
         //resposta do comando eh tratata em recebeDados        
         return;
     }
@@ -272,7 +287,7 @@ void * envia(void * sock){
         if ( mensagem[0] == '/') executaComando(socket,mensagem);
         else{      
             if(salaAtual < 0){
-                ecoaMensagemControleTela("Voce nao esta em nenhum canal.");
+                ecoaMensagemControleTela("Voce nao esta em nenhuma sala.");
             }else{       
                 //envia
                 bzero(mensagemEnviada,sizeof(mensagemEnviada));
@@ -299,15 +314,25 @@ int main(int argc, char *argv[])
     struct sockaddr_in serv_addr;
     struct hostent *server;
     pthread_t threadEnvia,threadRecebe;
-
+    char * hostname;
+    int porta;
     sem_init(&semaforoSC,0,1);
     
         if (argc < 2) {
         fprintf(stderr,"uso %s host\n", argv[0]);
         exit(0);
     }
-    
-    server = gethostbyname(argv[1]);
+ 
+    if(argc>=3){
+        porta=atoi(argv[1]);
+        hostname=argv[2];
+        if(porta<0)porta=PORTA_APLICACAO;
+    }else {
+        porta=PORTA_APLICACAO;
+        hostname=argv[1];
+    }
+   
+    server = gethostbyname(hostname);
     if (server == NULL) {
         fprintf(stderr,"Erro, host nao encontrado\n");
         exit(0);
@@ -316,8 +341,8 @@ int main(int argc, char *argv[])
     if ((socketServer = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
         printf("Erro na criacao do socket\n");
     
-    serv_addr.sin_family = AF_INET;     
-    serv_addr.sin_port = htons(PORTA_APLICACAO);    
+    serv_addr.sin_family = AF_INET;    
+    serv_addr.sin_port = htons(porta);    
     serv_addr.sin_addr = *((struct in_addr *)server->h_addr);
     bzero(&(serv_addr.sin_zero), 8);     
     
