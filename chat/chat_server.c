@@ -36,10 +36,21 @@ struct sala {
     int numeroSequenciaMensagemAtual;
 };
 
+//arg para pthread_create
+struct args{
+    int socket;
+    int id; //id do par de threads,
+};
 
+struct threadControl{
+    int sala; 
+    int nSeq;
+};
 //////Variaveis compartilhadas pelas threads
 struct sala salas[MAX_SALAS];
 sem_t semaforosSalas[MAX_SALAS]; //1 semaforo para cada sala
+sem_t semaforosThreads[MAX_SALAS];//sem da var abaixo
+struct threadControl threadSala[MAX_SALAS]; //armazena sala da thread e numero de sequencia
 ///////////////////////////////////////////////////////////////////////////////////
 
 
@@ -62,9 +73,10 @@ void inicializaSalas(){
 
 int atualizaCliente(int socket,int idSala,int seqCliente,int seqSala){
     if(seqCliente<seqSala){
-        write(socket,salas[idSala].bufferMensagemAtual,MAX_MENSAGEM);
+        fprintf(stdout,"Vou atualizar o cliente\n");
+        write(socket,salas[idSala].bufferMensagemAtual,strlen(salas[idSala].bufferMensagemAtual));
         salas[idSala].contadorLeituras--;
-        return seqCliente+1;
+        return seqSala;
     }
     return seqCliente;
 }
@@ -159,7 +171,8 @@ void executaComando(int socket,char * mensagem,int * salaCliente){
             //entra na sala
             salas[sala].nParticipantes++;            
             enviaMensagemControle(socket,joinSucesso,sala);    
-            fprintf(stdout,"Sala %d recebeu um novo membro.\n",sala); 
+            fprintf(stdout,"Sala %d recebeu um novo membro.\n",sala);
+            *salaCliente=sala; 
         }else{
             fprintf(stdout,"Sala %d nao existente\n",sala);
             write(socket,erroSalaJoin,strlen(erroSalaJoin));
@@ -219,67 +232,107 @@ void executaComando(int socket,char * mensagem,int * salaCliente){
 
 }
 
+void * atualizaClientes(void * args){
 
-//threa para gerencia de cada um dos clientes
-void * gerenteCliente(void * sock){
+    int id=(*(struct args*)args).id;
+    int socket = (*(struct args*)args).socket;
 
-    int socket = *(int*) sock;
     char nick[MAX_NICK];
     int sala=-1;
     char bufferMensagemRecebida[MAX_MENSAGEM];    
     char bufferMensagemEnviada[MAX_MENSAGEM];
     int numeroSequenciaCliente=0; 
     int numeroSequenciaServidor=0; 
-    struct aiocb acb; //struct para leitura assincrona
+    int nSeqAntigo;
+    if (socket < 0)  exit(3);
+    
+    bzero(bufferMensagemRecebida,MAX_MENSAGEM);
+    while(1){
+        //obtem sala atual
+        sem_wait(&semaforosThreads[id]);
+        sala=threadSala[id].sala;
+        numeroSequenciaCliente=threadSala[id].nSeq;
+        sem_post(&semaforosThreads[id]);
+
+        if(sala>=0){
+            //tenta atualizar cliente  
+            sem_wait(&semaforosSalas[sala]);
+            numeroSequenciaServidor = salas[sala].numeroSequenciaMensagemAtual;
+            nSeqAntigo=numeroSequenciaCliente;  
+            
+            numeroSequenciaCliente=atualizaCliente(socket,sala,numeroSequenciaCliente,numeroSequenciaServidor);
+            if(nSeqAntigo < numeroSequenciaCliente){
+                fprintf(stdout,"Cliente da sala %d foi atualizado\n",sala);
+            }
+            threadSala[id].nSeq=numeroSequenciaCliente;
+            sem_post(&semaforosSalas[sala]);                
+         }
+    }
+}
+
+
+
+//threa para gerencia de cada um dos clientes
+void * recebe(void * args){
+
+    
+    int id=(*(struct args*)args).id;
+    int socket = (*(struct args*)args).socket;
+    char nick[MAX_NICK];
+    int sala=-1;
+    char bufferMensagemRecebida[MAX_MENSAGEM];    
+    int numeroSequenciaCliente=0; 
+    int numeroSequenciaServidor=0; 
     int n;
+    
     if (socket < 0)  exit(3);
 
-    bzero((char*)&acb,sizeof(struct aiocb));
-    acb.aio_fildes=socket;
-    acb.aio_buf=bufferMensagemRecebida;
-    acb.aio_nbytes=MAX_MENSAGEM;
-
-    bzero(bufferMensagemRecebida,MAX_MENSAGEM);
+       bzero(bufferMensagemRecebida,MAX_MENSAGEM);
      
     while(1){
 
         bzero(bufferMensagemRecebida,MAX_MENSAGEM);
-        //le mensagem recebida
-        //aio_read(&acb);
-        //n=acb.aio_offset;
-        n=read(socket,bufferMensagemRecebida,MAX_MENSAGEM);
+                n=read(socket,bufferMensagemRecebida,MAX_MENSAGEM);
         bufferMensagemRecebida[MAX_MENSAGEM-1]='\0';
         if(n>0){
             //fprintf(stdout,"Oi sou uma thread cliente:\n%s\n",bufferMensagemRecebida);
-            
-            if(bufferMensagemRecebida[0]=='/') 
-                executaComando(socket,bufferMensagemRecebida,&sala);
-             else{/*DESCOMENTAR E VER PQ NAO FUNFA
+            fprintf(stdout,"mensagem recebida\n");
+            if(bufferMensagemRecebida[0]=='/'){ 
+                sem_wait(&semaforosThreads[id]);
+                executaComando(socket,bufferMensagemRecebida,&threadSala[id].sala);              
+                sala=threadSala[id].sala;
+                sem_post(&semaforosThreads[id]);
+            }
+            else{
                 if(sala>=0){
-                    //atualiza cliente 
-                    sem_wait(&semaforosSalas[sala]);
-                    numeroSequenciaServidor = salas[sala].numeroSequenciaMensagemAtual;
-                    numeroSequenciaCliente=atualizaCliente(socket,sala,numeroSequenciaCliente,numeroSequenciaServidor);
-                    sem_post(&semaforosSalas[sala]);
-                    
-                    //aguarda todos receberem a mensagem atual
-                    while(1){
+                        while(1){
                         sem_wait(&semaforosSalas[sala]);
-                        if(salas[sala].contadorLeituras ==0){
+
+                        if(salas[sala].contadorLeituras >=0){   
+                            fprintf(stdout,"Todos leram a ultima mensagem da sala %d.\n",sala);
                             //atualiza mensagem da sala,e seq do cliente
                             bzero(salas[sala].bufferMensagemAtual,MAX_MENSAGEM);
                             strcpy(salas[sala].bufferMensagemAtual,bufferMensagemRecebida);
                             atualizaContadorLeituras(sala);
-                            numeroSequenciaCliente++;
                             incrementaNumeroSequenciaServidor(sala);
+                            numeroSequenciaCliente=salas[sala].numeroSequenciaMensagemAtual;
+                            fprintf(stdout,"numero seq servidor: %d\n",salas[sala].numeroSequenciaMensagemAtual);
+                            //bzero(bufferMensagemRecebida,MAX_MENSAGEM); 
+                            fprintf(stdout,"Gravei uma mensagem no servidor\n");
+                            sem_post(&semaforosSalas[sala]);
+                            sem_wait(&semaforosThreads[id]);
+                            threadSala[id].nSeq=numeroSequenciaCliente;
+                            sem_post(&semaforosThreads[id]);
+                            
+
                             break;
                         }
                         sem_post(&semaforosSalas[sala]);
-                        bzero(bufferMensagemRecebida,MAX_MENSAGEM);
+                        //fprintf(stdout,"esperando para gravar no servidor\n");
                     
                     }
 
-                } */
+                }
              }  
         
         }
@@ -293,18 +346,22 @@ void * gerenteCliente(void * sock){
 int main(int argc, char *argv[ ]) {
    
     int i;
-    pthread_t threadsClientes[MAX_CLIENTES];
-    int socketAplicacao, socketCliente;
+    pthread_t threadsClientesEnvio[MAX_CLIENTES];
+    pthread_t threadsClientesRecebimento[MAX_CLIENTES];
+    int socketAplicacao, socketClienteEnvio,socketClienteRecebimento;
     socklen_t clilen;
     struct sockaddr_in serv_addr, cli_addr;
     int porta=0; 
 
     //inicializacao
     inicializaSalas();
-    memset(threadsClientes,0,sizeof(pthread_t)*MAX_CLIENTES);
-    for(i=0;i<MAX_SALAS;i++) 
+    memset(threadsClientesEnvio,0,sizeof(pthread_t)*MAX_CLIENTES);
+    memset(threadsClientesRecebimento,0,sizeof(pthread_t)*MAX_CLIENTES);
+    for(i=0;i<MAX_SALAS;i++){ 
         sem_init(&semaforosSalas[i],0,1); //exclusao mutua (S=1) na variavel compartilhada 
-    
+        sem_init(&semaforosThreads[i],0,1); //exclusao mutua (S=1) na variavel compartilhada 
+    }
+    memset(threadSala,0,sizeof(struct threadControl)*MAX_SALAS); 
     if ((socketAplicacao = socket(AF_INET, SOCK_STREAM, 0)) == -1){
         printf("Erro na criacao do socket");
         exit(3);
@@ -336,21 +393,34 @@ int main(int argc, char *argv[ ]) {
     while(1){
         
         //aguarda conexao
-        if ((socketCliente = accept(socketAplicacao, (struct sockaddr *) &cli_addr, &clilen)) == -1) 
+        if ((socketClienteEnvio = accept(socketAplicacao, (struct sockaddr *) &cli_addr, &clilen)) == -1) 
             printf("Erro em aceitar uma nova conexao\n");
         else {
             if(i>=MAX_CLIENTES) {
                 fprintf(stdout,"Numero maximo de clientes atingido. Ignorando novas conexoes");
                 break;
             }else{
-                //inicia thread para tratar nova conexao
-                pthread_create(&threadsClientes[i],NULL,gerenteCliente,(void*)&socketCliente);
+                struct args argEnvio;
+                struct args argRecebe;
+                
+                argEnvio.socket = socketClienteEnvio;
+                argEnvio.id=i;
+                argRecebe.socket=dup(socketClienteEnvio);
+                argRecebe.id=i;
+                
+                pthread_create(&threadsClientesEnvio[i],NULL,atualizaClientes,(void*)&argEnvio);
+                
+                pthread_create(&threadsClientesRecebimento[i],NULL,recebe,(void*)&argRecebe);
                 i++;
             }
         }
     }
 
-    getchar();
+    int j=0;
+    for(j=0;j<i;j++){
+        pthread_join(threadsClientesEnvio[j],NULL);
+        pthread_join(threadsClientesRecebimento[j],NULL);
+    }
     pthread_exit(0);
     return 0;
 }

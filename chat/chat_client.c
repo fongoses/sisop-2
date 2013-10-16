@@ -300,6 +300,7 @@ void trataRespostaComando(char * mensagem){
         //sai de uma sala
         
         sem_wait(&semaforoSC);
+        salaAtual=-1;
         limpaTelaPrincipal();
         exibeMensagemServidor();
         limpaAreaMensagem();
@@ -341,7 +342,8 @@ void * recebe(void * sock){
         //sem_wait(&semaforoSC); 
 
         bzero(resposta,MAX_MENSAGEM);
-        //ecoaMensagemTela("Recebendo resposta...");
+       // ecoaMensagemTela("Recebendo resposta...");
+
         n=read(socket,resposta,MAX_MENSAGEM);
         //aio_read(&acb);
         //n = acb.aio_offset;
