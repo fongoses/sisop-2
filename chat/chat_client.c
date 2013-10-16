@@ -201,6 +201,7 @@ void trataRespostaComando(char * mensagem){
         exibeMensagemSala(); 
         linhaAtual=1;
         colunaAtual=0;  
+
         return;
     }
 

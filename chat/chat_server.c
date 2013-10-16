@@ -10,6 +10,7 @@ utilizando threads e sockets.
 
 Versao servidor
 */
+#include <aio.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdlib.h>
@@ -31,14 +32,21 @@ struct sala {
     int id;
     int contadorLeituras; //antes de modificar o buffer de mensagem, verificar se todos os participantes leram.
     int nParticipantes;
-    char  *bufferMensagemAtual;
+    char  bufferMensagemAtual[MAX_MENSAGEM];
+    int numeroSequenciaMensagemAtual;
 };
 
 
 //////Variaveis compartilhadas pelas threads
 struct sala salas[MAX_SALAS];
-sem_t semaforoObjeto; //Semaforo para sc Todo: criar um para cada sala
+sem_t semaforosSalas[MAX_SALAS]; //1 semaforo para cada sala
 ///////////////////////////////////////////////////////////////////////////////////
+
+
+//strings de resposta aos comandos do cliente:
+char erroSalaCreate[]="/Erro: numero de sala invalido";
+char createSucesso[]="/create %d";
+
 
 void limpaBufferMensagemSala(int id){
     memset(salas[id].bufferMensagemAtual,0,MAX_MENSAGEM);
@@ -48,19 +56,153 @@ void inicializaSalas(){
     bzero(salas,sizeof(salas));
 }
 
+int atualizaCliente(int socket,int idSala,int seqCliente,int seqSala){
+    if(seqCliente<seqSala){
+        write(socket,salas[idSala].bufferMensagemAtual,MAX_MENSAGEM);
+        salas[idSala].contadorLeituras--;
+        return seqCliente+1;
+    }
+    return seqCliente;
+}
+
+void atualizaContadorLeituras(int idSala){
+    salas[idSala].contadorLeituras=salas[idSala].nParticipantes-1;
+}
+
+void incrementaNumeroSequenciaServidor(int idSala){
+    salas[idSala].numeroSequenciaMensagemAtual++;
+
+}
+
+void enviaMensagemControle(int socket, char *mensagem,int controle){
+
+    char mensagemEnviada[MAX_MENSAGEM];
+
+    if(!mensagem) return;
+
+    bzero(mensagemEnviada,MAX_MENSAGEM);
+    sprintf(mensagemEnviada,mensagem,controle);
+
+
+}
+
+void executaComando(int socket,char * mensagem){
+
+
+    char *comando =strtok(mensagem," ");
+    if(socket<0) return;
+
+    /* //Nao necessario, tratado locamente 
+    if(strcmp(comando,"/nick")==0){
+        //altera nick - realizado localmente
+        char * nick = strtok(NULL," ");
+        alteraNick(nick);
+        return;
+    }*/
+
+    if(strcmp(comando,"/create") == 0){
+
+        int sala=atoi(strtok(NULL," "));
+        if ((sala<0) || (sala>MAX_SALAS )) {
+            //envia mensagem ao cliente.
+            write(socket,erroSalaCreate,sizeof(erroSalaCreate));
+            return;
+        }
+        
+        sem_wait(&semaforosSalas[sala]);
+        if(salas[sala].nParticipantes==0){ 
+            //cria sala
+            salas[sala].nParticipantes=1;            
+            enviaMensagemControle(socket,createSucesso,sala);    
+        }
+        sem_post(&semaforosSalas[sala]);
+        return;
+    }
+
+    if(strcmp(comando,"/join") == 0){
+        //entre em uma sala
+        return;
+    }
+
+    if(strcmp(comando,"/leave") == 0){
+        //sai de uma sala
+        return;
+    }
+
+    if(strcmp(comando,"/close") == 0){
+        //fecha conexoes e programa
+        return;
+    }
+    
+   
+    //comando nao reconhecido
+    //exibeMensagemErro("Comando nao reconhecido"); 
+
+}
+
+
+
+
 //threa para gerencia de cada um dos clientes
 void * gerenteCliente(void * sock){
 
-////    int socket = *(int*) sock;
-     
+    int socket = *(int*) sock;
+    char nick[MAX_NICK];
+    int sala=-1;
+    char bufferMensagemRecebida[MAX_MENSAGEM];    
+    char bufferMensagemEnviada[MAX_MENSAGEM];
+    int numeroSequenciaCliente=0; 
+    int numeroSequenciaServidor=0; 
+    struct aiocb acb; //struct para leitura assincrona
+    int n;
+    if (socket < 0)  exit(3);
+
+    bzero((char*)&acb,sizeof(struct aiocb));
+    acb.aio_fildes=socket;
+    acb.aio_buf=bufferMensagemRecebida;
+    acb.aio_nbytes=MAX_MENSAGEM;
+
     while(1){
+        bzero(bufferMensagemRecebida,MAX_MENSAGEM);
+        
 
-        sleep(1);
+        //le mensagem recebida
+        aio_read(&acb);
+        n=acb.aio_offset;        
+        if(n>=0){
+            fprintf(stdout,"Oi sou uma thread cliente %d\n",socket);
+            
+            if(bufferMensagemRecebida[0]=='/') 
+                executaComando(socket,bufferMensagemRecebida);
+             else{
+                if(sala>=0){
+                    //atualiza cliente 
+                    sem_wait(&semaforosSalas[sala]);
+                    numeroSequenciaServidor = salas[sala].numeroSequenciaMensagemAtual;
+                    numeroSequenciaCliente=atualizaCliente(socket,sala,numeroSequenciaCliente,numeroSequenciaServidor);
+                    sem_post(&semaforosSalas[sala]);
+                    
+                    //aguarda todos receberem a mensagem atual
+                    while(1){
+                        sem_wait(&semaforosSalas[sala]);
+                        if(salas[sala].contadorLeituras ==0){
+                            //atualiza mensagem da sala,e seq do cliente
+                            bzero(salas[sala].bufferMensagemAtual,MAX_MENSAGEM);
+                            strcpy(salas[sala].bufferMensagemAtual,bufferMensagemRecebida);
+                            atualizaContadorLeituras(sala);
+                            numeroSequenciaCliente++;
+                            incrementaNumeroSequenciaServidor(sala);
+                            break;
+                        }
+                        sem_post(&semaforosSalas[sala]);
+                    
+                    }
 
-
-
-
-    }
+                } 
+             }  
+        
+        }
+    }//fim loop principal
 
 
 
@@ -79,8 +221,9 @@ int main(int argc, char *argv[ ]) {
     //inicializacao
     fprintf(stdout,"teste");
     inicializaSalas();
-    memset(threadsClientes,0,sizeof(pthread_t)*MAX_CLIENTES); 
-    sem_init(&semaforoObjeto,0,1); //exclusao mutua (S=1) na variavel compartilhada 
+    memset(threadsClientes,0,sizeof(pthread_t)*MAX_CLIENTES);
+    for(i=0;i<MAX_SALAS;i++) 
+        sem_init(&semaforosSalas[i],0,1); //exclusao mutua (S=1) na variavel compartilhada 
     
     if ((socketAplicacao = socket(AF_INET, SOCK_STREAM, 0)) == -1) 
         printf("Erro na criacao do socket");
