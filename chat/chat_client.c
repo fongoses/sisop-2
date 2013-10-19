@@ -66,9 +66,22 @@ void exibeMensagemSala(){
 
 void exibeStringMensagemRodape(){
 
-        mvprintw(linhaStringMensagem,0,"%s",stringMensagem);
-        refresh();
+    mvprintw(linhaStringMensagem,0,"%s",stringMensagem);
+    refresh();
 }
+
+void limpaAreaMensagem(){
+    mvhline(linhaStringMensagem,strlen(stringMensagem),' ',colunaMax);
+    refresh();
+}
+
+void reposicionaCursorMensagem(){
+ 
+    limpaAreaMensagem();
+    exibeStringMensagemRodape();
+       
+}
+
 
 void limpaTelaPrincipal(){
     int i;
@@ -98,7 +111,7 @@ void exibeMensagemServidor(){
 
 void ecoaMensagemTela(char * mensagem){
     aumentaLinhaTelaPrincipal();
-    mvprintw(linhaAtual,1,"eu: %s",mensagem);
+    mvprintw(linhaAtual,1,"%s",mensagem);
     refresh();
 }
 
@@ -108,12 +121,7 @@ void ecoaMensagemControleTela(char * mensagem){
     refresh();
 }
 
-void limpaAreaMensagem(){
-    int i;
-    for(i=strlen(stringMensagem);i<strlen(stringMensagem)+MAX_MENSAGEM;i++)
-        mvprintw(linhaStringMensagem,i," ");
-    refresh();
-}
+
 
 void exibeMensagemErro(char * mensagem){
     if(!mensagem) return;
@@ -333,11 +341,6 @@ void * recebe(void * sock){
     
     if (socket < 0)  exit(3);
 
-    //bzero((char*)&acb,sizeof(struct aiocb));
-    //acb.aio_fildes=socket;
-    //acb.aio_buf=resposta;
-    //acb.aio_nbytes=MAX_MENSAGEM;
-    
     while(1){
         //sem_wait(&semaforoSC); 
 
@@ -374,12 +377,12 @@ void * envia(void * sock){
     if(socket<0) exit(3);
 
     while(1){    
-        sem_wait(&semaforoSC);
-        exibeStringMensagemRodape();
-        sem_post(&semaforoSC);
-        
         bzero(mensagem, MAX_MENSAGEM);
-        mvgetnstr(linhaMax-2,sizeof(stringMensagem),mensagem,MAX_MENSAGEM);
+        
+        sem_wait(&semaforoSC);
+        reposicionaCursorMensagem();
+        sem_post(&semaforoSC);
+        mvgetnstr(linhaMax-2,strlen(stringMensagem),mensagem,MAX_MENSAGEM);
         
     
         if ( mensagem[0] == '/') executaComando(socket,mensagem);
@@ -390,16 +393,16 @@ void * envia(void * sock){
                 sem_post(&semaforoSC);
             }else{       
                 //envia
-                bzero(mensagemEnviada,MAX_MENSAGEM);
+                bzero(mensagemEnviada,MAX_MENSAGEM+MAX_NICK+2);
                 strcpy(mensagemEnviada,nickAtual);
                 strcat(mensagemEnviada,": ");
                 strcat(mensagemEnviada,mensagem);
-                n=write(socket, mensagem, strlen(mensagemEnviada));
+                n=write(socket, mensagemEnviada, strlen(mensagemEnviada));
                 if (n>0){
                     
-              //      sem_wait(&semaforoSC);
-            //        ecoaMensagemTela(mensagem);
-                //    sem_post(&semaforoSC);
+                    //sem_wait(&semaforoSC);
+                    //ecoaMensagemTela(nickAtual);
+                    //sem_post(&semaforoSC);
                 }
             }
         }
@@ -472,7 +475,7 @@ int main(int argc, char *argv[])
     exibeMensagemServidor();
     linhaBarraHorizontal=linhaStringMensagem-1;
     mvhline(linhaBarraHorizontal,0,'=',colunaMax);
-    
+    alteraNick(NULL); 
     //inicializa configs de sala
     salaAtual=-1;
     
