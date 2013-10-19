@@ -8,7 +8,7 @@ Alunos: Luiz Gustavo Frozi e  Mario Gasparoni Junior
 Implementacao de um servidor/cliente de chat
 utilizando threads e sockets.
 
-Versao servidor
+Versao servidor.
 */
 #include <aio.h>
 #include <pthread.h>
