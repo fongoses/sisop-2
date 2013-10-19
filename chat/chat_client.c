@@ -124,8 +124,8 @@ void ecoaMensagemTela(char * mensagem){
 
 void ecoaMensagemControleTela(char * mensagem){
     aumentaLinhaTelaPrincipal();
-    mvprintw(linhaAtual,1,"++system: %s",mensagem);
-    refresh();
+    mvprintw(linhaAtual,1,"++system: %s",mensagem);    
+    reposicionaCursorMensagem();
 }
 
 
@@ -176,7 +176,7 @@ void alteraNick(char*novoNick){
 
     if (strlen(novoNick)>MAX_NICK){
         sprintf(mensagemErroNick,"Nick deve ter entre 0 e %d caracteres.",MAX_NICK);
-        exibeMensagemErro(mensagemErroNick);
+        ecoaMensagemControleTela(mensagemErroNick);
         return;
     }else{
         strcpy(nickAtual,novoNick);
@@ -278,7 +278,15 @@ void executaComando(int socket, char * mensagem){
 }
 
 void trataRespostaComando(char * mensagem){
-    char *comando =strtok(mensagem," ");
+    
+    char *savedptr=0;
+    char mensagemOriginal[MAX_MENSAGEM];
+    char *comando;
+
+    bzero(mensagemOriginal,MAX_MENSAGEM);
+    strcpy(mensagemOriginal,mensagem);
+    
+    comando= strtok_r(mensagem," ",&savedptr);
    
     /* //Nao necessario, tratado locamente 
     if(strcmp(comando,"/nick")==0){
@@ -290,7 +298,7 @@ void trataRespostaComando(char * mensagem){
     if(strcmp(comando,"/create") == 0){
         
         sem_wait(&semaforoSC);
-        char *sala_s = strtok(NULL," ");
+        char *sala_s = strtok_r(NULL," ",&savedptr);
         if(!sala_s) return;
         
         int salatemp=atoi(sala_s);
@@ -307,11 +315,10 @@ void trataRespostaComando(char * mensagem){
     if(strcmp(comando,"/join") == 0){
         //entre em uma sala
         sem_wait(&semaforoSC);
-        char *sala_s = strtok(NULL," ");
+        char *sala_s = strtok_r(NULL," ",&savedptr);
         if(!sala_s) return;
        
         int salatemp=atoi(sala_s);
-        if (salatemp<0) return;
         salaAtual=salatemp;
  
         
@@ -341,7 +348,10 @@ void trataRespostaComando(char * mensagem){
     
    
     //comando nao reconhecido
-    //exibeMensagemErro("Comando nao reconhecido"); 
+    sem_wait(&semaforoSC);
+    ecoaMensagemControleTela(mensagemOriginal); 
+    sem_post(&semaforoSC);
+
 
 }
 

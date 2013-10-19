@@ -55,12 +55,15 @@ struct threadControl threadSala[MAX_SALAS]; //armazena sala da thread e numero d
 
 
 //strings de resposta aos comandos do cliente:
-char erroSalaCreate[]="/Erro: numero de sala invalido";
+char erroSalaCreate[]="Erro: numero de sala invalido";
 char createSucesso[]="/create %d";
-char erroSalaJoin[]="/Erro: nao foi possivel entra na sala";
+char erroSalaJoin[]="Erro: nao foi possivel entrar na sala";
+char erroSalaInexistenteJoin[]="Erro: sala inexistente.";
 char joinSucesso[]="/join %d";
-char erroSalaLeave[]="/Erro: nao foi possivel processar o leave";
+char erroSalaLeave[]="Erro: nao foi possivel processar o leave";
 char leaveSucesso[]="/leave %d";
+char erroSalaClose[]="Erro: nao foi possivel processar o close";
+char closeSucesso[]="/close";
 
 
 void limpaBufferMensagemSala(int id){
@@ -171,8 +174,8 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
         
         if ((sala<0) || (sala>=MAX_SALAS )) {
             //envia mensagem ao cliente.
-            fprintf(stdout,"Erro ao entrar na sala %d\n",sala);
-            write(socket,erroSalaJoin,strlen(erroSalaJoin));
+            fprintf(stdout,"Sala %d inexistente.\n",sala);
+            write(socket,erroSalaInexistenteJoin,strlen(erroSalaInexistenteJoin));
             return;
         }
         
@@ -188,7 +191,7 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
             *salaNova=sala;
         }else{
             fprintf(stdout,"Sala %d nao existente\n",sala);
-            write(socket,erroSalaJoin,strlen(erroSalaJoin));
+            write(socket,erroSalaInexistenteJoin,strlen(erroSalaInexistenteJoin));
         
         }
            
@@ -200,26 +203,34 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
 
     if(strcmp(comando,"/leave") == 0){
     
-        int salaAntiga;
+        int sala;
+        int salaAntiga; 
+        
+        sem_wait(&semaforosThreads[idCliente]);
+        sala=threadSala[idCliente].sala;
+        sem_post(&semaforosThreads[idCliente]);
+    
         //sai de uma sala
-        if ((threadSala[idCliente].sala<0) || (threadSala[idCliente].sala>=MAX_SALAS )) {
+        if ((sala<0) || (sala>=MAX_SALAS )) {
             //envia mensagem ao cliente.
             fprintf(stdout,"Usuario nao esta na sala %d\n",threadSala[idCliente].sala);
             write(socket,erroSalaLeave,strlen(erroSalaLeave));
             return;
         }
         
-        sem_wait(&semaforosSalas[threadSala[idCliente].sala]);
+        sem_wait(&semaforosSalas[sala]);
         sem_wait(&semaforosThreads[idCliente]);
 
         //sai da sala
-        salas[threadSala[idCliente].sala].nParticipantes--; 
-        fprintf(stdout,"Sala %d perde um participante.\nNum de participantes no momento: %d\n",threadSala[idCliente].sala,salas[threadSala[idCliente].sala].nParticipantes);
-        salaAntiga=threadSala[idCliente].sala;
+        salas[sala].nParticipantes--; 
+        fprintf(stdout,"Sala %d perde um participante.\nNum de participantes no momento: %d\n",sala,salas[sala].nParticipantes);
+        if(salas[sala].nParticipantes <= 0 ) fprintf(stdout,"Sala %d nao possui mais ninguem, destruida.\n",sala);
+        salaAntiga=sala;
         threadSala[idCliente].sala=-1;
-        *salaNova=threadSala[idCliente].sala;
+        sala=-1;
+        *salaNova=sala;
 
-        enviaMensagemControle(socket,leaveSucesso,threadSala[idCliente].sala);    
+        enviaMensagemControle(socket,leaveSucesso,salaAntiga);    
           
         sem_post(&semaforosThreads[idCliente]);
         sem_post(&semaforosSalas[salaAntiga]);
@@ -227,30 +238,39 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
     }
 
     if(strcmp(comando,"/close") == 0){
-        //fecha conexoes e programa
+        int sala;
+        int salaAntiga; 
+        
+        sem_wait(&semaforosThreads[idCliente]);
+        sala=threadSala[idCliente].sala;
+        sem_post(&semaforosThreads[idCliente]);
+    
         //sai de uma sala
-        if ((threadSala[idCliente].sala<0) || (threadSala[idCliente].sala>=MAX_SALAS )) {
+        if ((sala<0) || (sala>=MAX_SALAS )) {
             //envia mensagem ao cliente.
-            fprintf(stdout,"Erro: Usuario nao esta na sala %d\n",threadSala[idCliente].sala);
-            exit(0);
+            fprintf(stdout,"Usuario deixou o servidor.\n");
+            write(socket,closeSucesso,strlen(closeSucesso));
             return;
         }
         
-        sem_wait(&semaforosSalas[threadSala[idCliente].sala]);
+        sem_wait(&semaforosSalas[sala]);
         sem_wait(&semaforosThreads[idCliente]);
-        
-    //entra na sala
-        salas[threadSala[idCliente].sala].nParticipantes--;         
-        threadSala[idCliente].sala=-1;
-        *salaNova=threadSala[idCliente].sala;
 
-        enviaMensagemControle(socket,leaveSucesso,threadSala[idCliente].sala);    
-        fprintf(stdout,"Sala %d perde um participante.\n",threadSala[idCliente].sala);
-        
+        //sai da sala
+        salas[sala].nParticipantes--; 
+        fprintf(stdout,"Sala %d perde um participante.\nNum de participantes no momento: %d\n",sala,salas[sala].nParticipantes);
+        if(salas[sala].nParticipantes <= 0 ) fprintf(stdout,"Sala %d nao possui mais ninguem, destruida.\n",sala);
+        salaAntiga=sala;
+        threadSala[idCliente].sala=-1;
+        sala=-1;
+        *salaNova=sala;
+
+        enviaMensagemControle(socket,closeSucesso,salaAntiga);    
+          
         sem_post(&semaforosThreads[idCliente]);
-        sem_post(&semaforosSalas[threadSala[idCliente].sala]);
- 
+        sem_post(&semaforosSalas[salaAntiga]);
         return;
+
     }
     
    
@@ -263,7 +283,7 @@ void gravaMensagemSala(int sala, int id, char * bufferMensagemRecebida){
     while(1){ //grava mensagem na sala
         sem_wait(&semaforosSalas[sala]);
         sem_wait(&semaforosThreads[id]);
-        fprintf(stdout,"recebe() entrou no semaforo\n");
+        //fprintf(stdout,"recebe() entrou no semaforo\n");
        
         if(salas[sala].contadorLeituras <=0){  
 
@@ -287,7 +307,7 @@ void gravaMensagemSala(int sala, int id, char * bufferMensagemRecebida){
 
         sem_post(&semaforosThreads[id]);
         sem_post(&semaforosSalas[sala]);
-        fprintf(stdout,"recebe() saiu do semaforo\n");
+        //fprintf(stdout,"recebe() saiu do semaforo\n");
         //fprintf(stdout,"esperando para gravar no servidor %d\n",salas[sala].contadorLeituras);
     }
 
