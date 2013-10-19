@@ -119,7 +119,7 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
 
     bzero(mensagemOriginal,MAX_MENSAGEM);
     strcpy(mensagemOriginal,mensagem);
-    
+   
     comando=strtok_r(mensagem," ",&savedptr);
     
     /* //Nao necessario, tratado locamente 
@@ -200,6 +200,7 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
 
     if(strcmp(comando,"/leave") == 0){
     
+        int salaAntiga;
         //sai de uma sala
         if ((threadSala[idCliente].sala<0) || (threadSala[idCliente].sala>=MAX_SALAS )) {
             //envia mensagem ao cliente.
@@ -213,14 +214,15 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
 
         //sai da sala
         salas[threadSala[idCliente].sala].nParticipantes--; 
+        fprintf(stdout,"Sala %d perde um participante.\nNum de participantes no momento: %d\n",threadSala[idCliente].sala,salas[threadSala[idCliente].sala].nParticipantes);
+        salaAntiga=threadSala[idCliente].sala;
         threadSala[idCliente].sala=-1;
         *salaNova=threadSala[idCliente].sala;
 
         enviaMensagemControle(socket,leaveSucesso,threadSala[idCliente].sala);    
-        fprintf(stdout,"Sala %d perde um participante.\n",threadSala[idCliente].sala);
           
         sem_post(&semaforosThreads[idCliente]);
-        sem_post(&semaforosSalas[threadSala[idCliente].sala]);
+        sem_post(&semaforosSalas[salaAntiga]);
         return;
     }
 
@@ -369,7 +371,7 @@ void * recebe(void * args){
         bufferMensagemRecebida[MAX_MENSAGEM-1]='\0';
         if(n>0){
             //fprintf(stdout,"Oi sou uma thread cliente:\n%s\n",bufferMensagemRecebida);
-            fprintf(stdout,"mensagem recebida\n");
+            //fprintf(stdout,"mensagem recebida\n");
              
             if(sala>=0){
                 if(bufferMensagemRecebida[0]=='/'){
@@ -377,8 +379,7 @@ void * recebe(void * args){
                 } else gravaMensagemSala(sala,id,bufferMensagemRecebida); //bloqueante , e ja garante exclusao mutua
             }else {//sala nao conhecida ainda
                 executaComando(socket,bufferMensagemRecebida,id,&sala);
-                fprintf(stdout,"Comando fora da sala\n");
-                
+                                
             }
         }
     }//fim loop principal

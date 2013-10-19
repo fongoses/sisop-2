@@ -21,6 +21,7 @@ Versao cliente.
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h> 
+#include <time.h>
 
 #define PORTA_APLICACAO 2709
 #define MAX_MENSAGEM 60
@@ -82,6 +83,12 @@ void reposicionaCursorMensagem(){
        
 }
 
+void inicializaRodape(){
+
+    mvhline(linhaBarraHorizontal,0,'=',colunaMax);
+    limpaAreaMensagem();    
+    exibeStringMensagemRodape();
+}
 
 void limpaTelaPrincipal(){
     int i;
@@ -131,13 +138,35 @@ void exibeMensagemErro(char * mensagem){
     
 }
 
+//usado nos comandos create e join
+exibeTelaSala(){
+
+    limpaTelaPrincipal();
+    exibeMensagemSala(); 
+    limpaAreaMensagem();
+    exibeStringMensagemRodape();
+    linhaAtual=1;
+    colunaAtual=0;  
+}    
+
+//usado no comando /leave
+void exibeTelaServidor(){
+    limpaTelaPrincipal();    
+    exibeMensagemServidor();
+    inicializaRodape();
+
+
+}
 void alteraNick(char*novoNick){
 
 
     char mensagemErroNick[MAX_MENSAGEM];
     char mensagemAlteracaoNick[MAX_MENSAGEM];
-    
+    struct timespec time;
+     
     if(!novoNick) {
+        clock_gettime(CLOCK_REALTIME,&time);
+        srand(time.tv_nsec);
         sprintf(nickAtual,"user%d",rand()%10000);
         sprintf(mensagemAlteracaoNick,"Nick alterado para: %s.",nickAtual);
         ecoaMensagemControleTela(mensagemAlteracaoNick); 
@@ -190,7 +219,7 @@ void executaComando(int socket, char * mensagem){
         }
                
         sem_wait(&semaforoSC);
-        salaAtual=atoi(sala_s);
+        //salaAtual=atoi(sala_s); atualiza sala na resposta
         sem_post(&semaforoSC);
         write(socket,mensagemOriginal,strlen(mensagemOriginal));
         //resposta do comando eh tratata em recebeDados        
@@ -269,13 +298,8 @@ void trataRespostaComando(char * mensagem){
         salaAtual=salatemp;
         
         //Cria sala
-        limpaTelaPrincipal();
-        exibeMensagemSala(); 
-        limpaAreaMensagem();
-        exibeStringMensagemRodape();
-        linhaAtual=0;
-        colunaAtual=0;  
-        
+        exibeTelaSala();   
+            
         sem_post(&semaforoSC);
         return;
     }
@@ -292,12 +316,7 @@ void trataRespostaComando(char * mensagem){
  
         
         //Entra na sala
-        limpaTelaPrincipal();
-        exibeMensagemSala(); 
-        limpaAreaMensagem();
-        exibeStringMensagemRodape();
-        linhaAtual=0;
-        colunaAtual=0;  
+        exibeTelaSala();
         
         sem_post(&semaforoSC);
      
@@ -306,17 +325,10 @@ void trataRespostaComando(char * mensagem){
 
     if(strcmp(comando,"/leave") == 0){
         //sai de uma sala
-        
+         
         sem_wait(&semaforoSC);
         salaAtual=-1;
-        limpaTelaPrincipal();
-        exibeMensagemServidor();
-        limpaAreaMensagem();
-        linhaBarraHorizontal=linhaStringMensagem-1;
-        mvhline(linhaBarraHorizontal,0,'=',colunaMax);
-        exibeStringMensagemRodape();
-        linhaAtual=8;
- 
+        exibeTelaServidor();
         sem_post(&semaforoSC);
         return;
     }
