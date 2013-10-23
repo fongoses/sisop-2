@@ -421,9 +421,16 @@ void * recebe(void * sock){
             
                 sem_wait(&semaforoSC);
                 ecoaMensagemTela(resposta);
+                sem_post(&semaforoSC);
+                refresh();
+                sem_wait(&semaforoSC);
                 limpaAreaMensagem();
+                sem_post(&semaforoSC);
+                refresh();
+                sem_wait(&semaforoSC);
                 exibeStringMensagemRodape();
                 sem_post(&semaforoSC);
+                refresh();
             }
         }
 
