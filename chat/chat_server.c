@@ -56,6 +56,7 @@ struct threadControl threadSala[MAX_SALAS]; //armazena sala da thread e numero d
 
 //strings de resposta aos comandos do cliente:
 char erroSalaCreate[]="Erro: numero de sala invalido";
+char erroSalaExistenteCreate[]="Erro: Sala ja existe";
 char createSucesso[]="/create %d";
 char erroSalaJoin[]="Erro: nao foi possivel entrar na sala";
 char erroSalaInexistenteJoin[]="Erro: sala inexistente.";
@@ -160,6 +161,10 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
             threadSala[idCliente].sala=sala;
             threadSala[idCliente].nSeq=0;
             *salaNova=sala;
+        }else {
+        
+            fprintf(stdout,"Erro ao criar sala %d. Sala ja existe.\n",sala);
+            write(socket,erroSalaExistenteCreate,strlen(erroSalaExistenteCreate));
         }
         sem_post(&semaforosThreads[idCliente]);
         sem_post(&semaforosSalas[sala]);
@@ -189,6 +194,7 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
             enviaMensagemControle(socket,joinSucesso,sala);    
             fprintf(stdout,"Sala %d recebeu um novo membro.\n",sala);
             threadSala[idCliente].sala=sala; 
+            threadSala[idCliente].nSeq=0; 
             *salaNova=sala;
         }else{
             fprintf(stdout,"Sala %d nao existente\n",sala);
@@ -288,6 +294,7 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
 
         enviaMensagemControle(socket,closeSucesso,salaAntiga);    
           
+        fprintf(stdout,"Usuario deixou o servidor.\n");
         sem_post(&semaforosThreads[idCliente]);
         sem_post(&semaforosSalas[salaAntiga]);
         return;
@@ -355,10 +362,10 @@ void * atualizaClientes(void * args){
     int id=(*(struct args*)args).id;
     int socket = (*(struct args*)args).socket;
 
-    char nick[MAX_NICK];
+    //char nick[MAX_NICK];
     int sala=-1;
     char bufferMensagemRecebida[MAX_MENSAGEM];    
-    char bufferMensagemEnviada[MAX_MENSAGEM];
+    //char bufferMensagemEnviada[MAX_MENSAGEM];
     int numeroSequenciaCliente=0; 
     int numeroSequenciaServidor=0; 
     int nSeqAntigo;
@@ -394,11 +401,11 @@ void * recebe(void * args){
     
     int id=(*(struct args*)args).id;
     int socket = (*(struct args*)args).socket;
-    char nick[MAX_NICK];
+    //char nick[MAX_NICK];
     int sala=-1;
     char bufferMensagemRecebida[MAX_MENSAGEM];    
-    int numeroSequenciaCliente=0; 
-    int numeroSequenciaServidor=0; 
+    //int numeroSequenciaCliente=0; 
+    //int numeroSequenciaServidor=0; 
     int n;
     
     if (socket < 0)  exit(3);
@@ -435,7 +442,7 @@ int main(int argc, char *argv[ ]) {
     int i;
     pthread_t threadsClientesEnvio[MAX_CLIENTES];
     pthread_t threadsClientesRecebimento[MAX_CLIENTES];
-    int socketAplicacao, socketClienteEnvio,socketClienteRecebimento;
+    int socketAplicacao, socketClienteEnvio;
     socklen_t clilen;
     struct sockaddr_in serv_addr, cli_addr;
     int porta=0; 

@@ -95,10 +95,10 @@ void limpaTelaPrincipal(){
     int i;
     for(i=0;i<linhaBarraHorizontal;i++){
         mvhline(i,0,' ',colunaMax);
+        refresh();
     }
     linhaAtual=0;
     colunaAtual=0; 
-    refresh();
 }
 
 void aumentaLinhaTelaPrincipal(){
@@ -171,6 +171,7 @@ void alteraNick(char*novoNick){
         sprintf(nickAtual,"user%d",rand()%10000);
         sprintf(mensagemAlteracaoNick,"Nick alterado para: %s.",nickAtual);
         ecoaMensagemControleTela(mensagemAlteracaoNick); 
+        reposicionaCursorMensagem();
 
         return;
     }
@@ -182,9 +183,10 @@ void alteraNick(char*novoNick){
     }else{
         strcpy(nickAtual,novoNick);
         sprintf(mensagemAlteracaoNick,"Nick alterado para: %s.",nickAtual);
-        //sem_wait(&semaforoSC);
+        sem_wait(&semaforoSC);
         ecoaMensagemControleTela(mensagemAlteracaoNick); 
-        //sem_post(&semaforoSC
+        reposicionaCursorMensagem();
+        sem_post(&semaforoSC);
     }
 
 }
@@ -243,9 +245,7 @@ void executaComando(int socket, char * mensagem){
         //altera nick - realizado localmente
         char * nick = strtok_r(NULL," ",&savedptr);
         
-        sem_wait(&semaforoSC);
         alteraNick(nick);        
-        sem_post(&semaforoSC);
         return;
     }
 
@@ -448,6 +448,7 @@ void * envia(void * sock){
         sem_post(&semaforoSC);
 
         //leStringEntrada(mensagem,MAX_MENSAGEM);
+        bzero(mensagem,MAX_MENSAGEM);
         mvgetnstr(linhaMax-2,strlen(stringMensagem),mensagem,MAX_MENSAGEM);
     
         if ( mensagem[0] == '/') executaComando(socket,mensagem);
@@ -526,6 +527,7 @@ int main(int argc, char *argv[])
     }
 
     socketRead = dup(socketWrite); //duplica o socket, para leitura  
+    sem_init(&semaforoSC,0,1);
  
     //inicializa variaveis da tela
     mainWindow = initscr();
@@ -550,7 +552,6 @@ int main(int argc, char *argv[])
     
 
     //cria threads de envio e recebimentio    
-    sem_init(&semaforoSC,0,1);
     pthread_create(&threadEnvia,NULL,envia,(void*)&socketWrite);
     pthread_create(&threadRecebe,NULL,recebe,(void*)&socketRead);
     pthread_join(threadEnvia,NULL);
