@@ -52,6 +52,7 @@ char stringServidor_Help[]= "Comandos Uteis:\n\t/nick - alterar seu nick.\n"
 int linhaMax,colunaMax;
 int linhaStringMensagem,colunaStringMensagem; //posicao da string 'Mensagem:'
 int linhaBarraHorizontal;
+WINDOW * mainWindow;
 //todas as funcoes abaixo que lidam com a tela, necessitam ser chamadas
 //dentro de um semaforo, ja que as variaveis de controle da tela
 //sao compartilhadas
@@ -139,7 +140,7 @@ void exibeMensagemErro(char * mensagem){
 }
 
 //usado nos comandos create e join
-exibeTelaSala(){
+void exibeTelaSala(){
 
     limpaTelaPrincipal();
     exibeMensagemSala(); 
@@ -181,10 +182,50 @@ void alteraNick(char*novoNick){
     }else{
         strcpy(nickAtual,novoNick);
         sprintf(mensagemAlteracaoNick,"Nick alterado para: %s.",nickAtual);
+        //sem_wait(&semaforoSC);
         ecoaMensagemControleTela(mensagemAlteracaoNick); 
+        //sem_post(&semaforoSC
     }
 
 }
+/*
+void leStringEntrada(char * buffer, int len){
+
+    if((buffer=NULL)||(len < 1)) return;
+    
+    char c;
+    int i=0;
+    int x,y;
+    i=0;
+    char a;
+    
+    while(((c=getchar()) != '\n') && (i < len)){ 
+        getsyx(y,x);
+        *buffer=c;
+        //a=c;
+        if((x<strlen(stringMensagem)) || (y != linhaStringMensagem)) {
+            setsyx(linhaStringMensagem,2);
+            i=2;
+        }else if((x>MAX_MENSAGEM+strlen(stringMensagem)) || (y != linhaStringMensagem)) {
+                i=MAX_MENSAGEM+strlen(stringMensagem);
+                setsyx(linhaStringMensagem,i);
+             }else if ((c == 127) || (c == 8)){ 
+                    buffer[i]=' ';
+                    i--;
+                }else {
+                    i++;
+                }
+        
+       //buffer[i+1]='\n';     
+       //ecoaMensagemTela(buffer);     
+//       refresh();
+    }    
+    setsyx(linhaStringMensagem,strlen(stringMensagem));
+    ecoaMensagemTela(buffer); 
+    refresh();
+
+}
+*/
 void executaComando(int socket, char * mensagem){
   
     char *savedptr=0;
@@ -218,9 +259,9 @@ void executaComando(int socket, char * mensagem){
             return;
         }
                
-        sem_wait(&semaforoSC);
+        //sem_wait(&semaforoSC);
         //salaAtual=atoi(sala_s); atualiza sala na resposta
-        sem_post(&semaforoSC);
+        //sem_post(&semaforoSC);
         write(socket,mensagemOriginal,strlen(mensagemOriginal));
         //resposta do comando eh tratata em recebeDados        
         return;
@@ -342,6 +383,7 @@ void trataRespostaComando(char * mensagem){
 
     if(strcmp(comando,"/close") == 0){
         //fecha conexoes e programa
+        system("reset");
         exit(0);
         return;
     }
@@ -404,8 +446,9 @@ void * envia(void * sock){
         sem_wait(&semaforoSC);
         reposicionaCursorMensagem();
         sem_post(&semaforoSC);
+
+        //leStringEntrada(mensagem,MAX_MENSAGEM);
         mvgetnstr(linhaMax-2,strlen(stringMensagem),mensagem,MAX_MENSAGEM);
-        
     
         if ( mensagem[0] == '/') executaComando(socket,mensagem);
         else{      
@@ -446,7 +489,6 @@ int main(int argc, char *argv[])
     pthread_t threadEnvia,threadRecebe;
     char * hostname;
     int porta;
-    sem_init(&semaforoSC,0,1);
     int socketWrite,socketRead;
     
     
@@ -478,7 +520,6 @@ int main(int argc, char *argv[])
     serv_addr.sin_addr = *((struct in_addr *)server->h_addr);
     bzero(&(serv_addr.sin_zero), 8);     
     
-    
     if (connect(socketWrite,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
         printf("Erro ao conectar\n");
         exit(3);
@@ -487,7 +528,13 @@ int main(int argc, char *argv[])
     socketRead = dup(socketWrite); //duplica o socket, para leitura  
  
     //inicializa variaveis da tela
-    initscr();
+    mainWindow = initscr();
+    cbreak();
+    nonl();
+    intrflush(stdscr, FALSE);
+    keypad(stdscr, TRUE);
+
+   //noecho();
     getmaxyx(stdscr,linhaMax,colunaMax);    
     linhaAtual=0;
     colunaAtual=0;
@@ -502,7 +549,8 @@ int main(int argc, char *argv[])
     salaAtual=-1;
     
 
-    //cria threads de envio e recebimento
+    //cria threads de envio e recebimentio    
+    sem_init(&semaforoSC,0,1);
     pthread_create(&threadEnvia,NULL,envia,(void*)&socketWrite);
     pthread_create(&threadRecebe,NULL,recebe,(void*)&socketRead);
     pthread_join(threadEnvia,NULL);

@@ -157,7 +157,8 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
             salas[sala].nParticipantes=1;            
             enviaMensagemControle(socket,createSucesso,sala);    
             fprintf(stdout,"Sala %d criada.\n",sala);
-            threadSala[idCliente].sala =sala;
+            threadSala[idCliente].sala=sala;
+            threadSala[idCliente].nSeq=0;
             *salaNova=sala;
         }
         sem_post(&semaforosThreads[idCliente]);
@@ -223,8 +224,17 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
 
         //sai da sala
         salas[sala].nParticipantes--; 
+        salas[sala].contadorLeituras--; 
+        if(salas[sala].contadorLeituras <0) salas[sala].contadorLeituras=0;
+
         fprintf(stdout,"Sala %d perde um participante.\nNum de participantes no momento: %d\n",sala,salas[sala].nParticipantes);
-        if(salas[sala].nParticipantes <= 0 ) fprintf(stdout,"Sala %d nao possui mais ninguem, destruida.\n",sala);
+        if(salas[sala].nParticipantes <= 0 ) {
+             fprintf(stdout,"Sala %d nao possui mais ninguem, destruida.\n",sala);
+             salas[sala].nParticipantes=0;
+             bzero(salas[sala].bufferMensagemAtual,MAX_MENSAGEM);
+            salas[sala].numeroSequenciaMensagemAtual=0;
+            
+         }
         salaAntiga=sala;
         threadSala[idCliente].sala=-1;
         sala=-1;
@@ -258,8 +268,19 @@ void executaComando(int socket,char * mensagem,int idCliente,int * salaNova){
 
         //sai da sala
         salas[sala].nParticipantes--; 
+        salas[sala].contadorLeituras--; 
+        if(salas[sala].contadorLeituras <0) salas[sala].contadorLeituras=0;
         fprintf(stdout,"Sala %d perde um participante.\nNum de participantes no momento: %d\n",sala,salas[sala].nParticipantes);
-        if(salas[sala].nParticipantes <= 0 ) fprintf(stdout,"Sala %d nao possui mais ninguem, destruida.\n",sala);
+        if(salas[sala].nParticipantes <= 0 ) {
+             fprintf(stdout,"Sala %d nao possui mais ninguem, destruida.\n",sala);
+             //destroi sala
+             salas[sala].nParticipantes=0;
+             bzero(salas[sala].bufferMensagemAtual,MAX_MENSAGEM);
+             salas[sala].numeroSequenciaMensagemAtual=0;
+          
+         }
+ 
+
         salaAntiga=sala;
         threadSala[idCliente].sala=-1;
         sala=-1;
@@ -307,7 +328,7 @@ void gravaMensagemSala(int sala, int id, char * bufferMensagemRecebida){
 
         sem_post(&semaforosThreads[id]);
         sem_post(&semaforosSalas[sala]);
-        //fprintf(stdout,"recebe() saiu do semaforo\n");
+        ///fprintf(stdout,"recebe() saiu do semaforo\n");
         //fprintf(stdout,"esperando para gravar no servidor %d\n",salas[sala].contadorLeituras);
     }
 
