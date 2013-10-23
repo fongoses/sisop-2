@@ -50,7 +50,7 @@ struct threadControl{
 struct sala salas[MAX_SALAS];
 sem_t semaforosSalas[MAX_SALAS]; //1 semaforo para cada sala
 sem_t semaforosThreads[MAX_SALAS];//sem da var abaixo
-struct threadControl threadSala[MAX_SALAS]; //armazena sala da thread e numero de sequencia
+struct threadControl threadSala[MAX_CLIENTES]; //armazena sala da thread e numero de sequencia
 ///////////////////////////////////////////////////////////////////////////////////
 
 
